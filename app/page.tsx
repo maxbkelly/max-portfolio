@@ -99,7 +99,8 @@ export default function Home() {
         tile.style.setProperty("--mag-rx", "0deg");
         tile.style.setProperty("--mag-ry", "0deg");
         tile.style.setProperty("--mag-skew", "0deg");
-        tile.style.setProperty("--mag-scale", "1");
+        tile.style.setProperty("--mag-scale-x", "1");
+        tile.style.setProperty("--mag-scale-y", "1");
       }
     };
 
@@ -112,13 +113,20 @@ export default function Home() {
         const dx = pointerX - centerX;
         const dy = pointerY - centerY;
         const distance = Math.hypot(dx, dy);
-        const pull = Math.pow(Math.max(0, 1 - distance / 430), 2);
-        tile.style.setProperty("--mag-x", `${dx * pull * 0.035}px`);
-        tile.style.setProperty("--mag-y", `${dy * pull * 0.035}px`);
-        tile.style.setProperty("--mag-rx", `${-dy * pull * 0.006}deg`);
-        tile.style.setProperty("--mag-ry", `${dx * pull * 0.006}deg`);
-        tile.style.setProperty("--mag-skew", `${dx * pull * 0.0018}deg`);
-        tile.style.setProperty("--mag-scale", `${1 + pull * 0.012}`);
+        const pull = Math.pow(Math.max(0, 1 - distance / 720), 1.65);
+        const directionX = distance ? dx / distance : 0;
+        const directionY = distance ? dy / distance : 0;
+        const attraction = Math.min(18, distance * 0.09) * pull;
+        const localX = Math.max(-1, Math.min(1, dx / (tile.offsetWidth / 2)));
+        const localY = Math.max(-1, Math.min(1, dy / (tile.offsetHeight / 2)));
+
+        tile.style.setProperty("--mag-x", `${directionX * attraction}px`);
+        tile.style.setProperty("--mag-y", `${directionY * attraction}px`);
+        tile.style.setProperty("--mag-rx", `${-localY * pull * 1.5}deg`);
+        tile.style.setProperty("--mag-ry", `${localX * pull * 1.5}deg`);
+        tile.style.setProperty("--mag-skew", `${localX * pull * 0.7}deg`);
+        tile.style.setProperty("--mag-scale-x", `${1 + pull * (0.014 + Math.abs(localX) * 0.006)}`);
+        tile.style.setProperty("--mag-scale-y", `${1 + pull * (0.01 + Math.abs(localY) * 0.006)}`);
       }
     };
 
@@ -128,17 +136,17 @@ export default function Home() {
       if (!animationFrame) animationFrame = window.requestAnimationFrame(renderPull);
     };
 
-    window.addEventListener("mousemove", trackPull, { passive: true });
+    window.addEventListener("pointermove", trackPull, { passive: true });
     window.addEventListener("blur", reset);
     document.documentElement.addEventListener("mouseleave", reset);
     return () => {
-      window.removeEventListener("mousemove", trackPull);
+      window.removeEventListener("pointermove", trackPull);
       window.removeEventListener("blur", reset);
       document.documentElement.removeEventListener("mouseleave", reset);
       if (animationFrame) window.cancelAnimationFrame(animationFrame);
       reset();
     };
-  }, [category]);
+  }, [category, showWork]);
 
   const close = useCallback(() => {
     setViewerIndex(null);
