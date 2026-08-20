@@ -56,7 +56,6 @@ function VideoTile({ project, onOpen }: { project: Project; onOpen: () => void }
           onLoad={() => send("getDuration")}
         />
         <span className="tile-shade" />
-        <span className="tile-index">{project.category}</span>
       </button>
       <span
         className={`tile-cursor ${active ? "visible" : ""}`}
@@ -85,31 +84,34 @@ export default function Home() {
 
   useEffect(() => {
     const grid = gridRef.current;
-    if (!grid || !window.matchMedia("(pointer: fine)").matches || window.matchMedia("(prefers-reduced-motion: reduce)").matches) return;
+    if (!grid) return;
 
-    const tiles = Array.from(grid.querySelectorAll<HTMLElement>(".project-tile"));
+    const tiles = Array.from(grid.querySelectorAll<HTMLElement>(".project-tile")).map((wrapper) => ({
+      wrapper,
+      surface: wrapper.querySelector<HTMLElement>(".tile-hit"),
+    })).filter((tile): tile is { wrapper: HTMLElement; surface: HTMLElement } => Boolean(tile.surface));
     let animationFrame = 0;
     let pointerX = -1000;
     let pointerY = -1000;
 
     const reset = () => {
-      for (const tile of tiles) {
-        tile.style.setProperty("--mag-x", "0px");
-        tile.style.setProperty("--mag-y", "0px");
-        tile.style.setProperty("--mag-rx", "0deg");
-        tile.style.setProperty("--mag-ry", "0deg");
-        tile.style.setProperty("--mag-skew", "0deg");
-        tile.style.setProperty("--mag-scale-x", "1");
-        tile.style.setProperty("--mag-scale-y", "1");
+      for (const { surface } of tiles) {
+        surface.style.setProperty("--mag-x", "0px");
+        surface.style.setProperty("--mag-y", "0px");
+        surface.style.setProperty("--mag-rx", "0deg");
+        surface.style.setProperty("--mag-ry", "0deg");
+        surface.style.setProperty("--mag-skew", "0deg");
+        surface.style.setProperty("--mag-scale-x", "1");
+        surface.style.setProperty("--mag-scale-y", "1");
       }
     };
 
     const renderPull = () => {
       animationFrame = 0;
       const gridBounds = grid.getBoundingClientRect();
-      for (const tile of tiles) {
-        const centerX = gridBounds.left + tile.offsetLeft + tile.offsetWidth / 2;
-        const centerY = gridBounds.top + tile.offsetTop + tile.offsetHeight / 2;
+      for (const { wrapper, surface } of tiles) {
+        const centerX = gridBounds.left + wrapper.offsetLeft + wrapper.offsetWidth / 2;
+        const centerY = gridBounds.top + wrapper.offsetTop + wrapper.offsetWidth / 2;
         const dx = pointerX - centerX;
         const dy = pointerY - centerY;
         const distance = Math.hypot(dx, dy);
@@ -117,16 +119,16 @@ export default function Home() {
         const directionX = distance ? dx / distance : 0;
         const directionY = distance ? dy / distance : 0;
         const attraction = Math.min(18, distance * 0.09) * pull;
-        const localX = Math.max(-1, Math.min(1, dx / (tile.offsetWidth / 2)));
-        const localY = Math.max(-1, Math.min(1, dy / (tile.offsetHeight / 2)));
+        const localX = Math.max(-1, Math.min(1, dx / (wrapper.offsetWidth / 2)));
+        const localY = Math.max(-1, Math.min(1, dy / (wrapper.offsetWidth / 2)));
 
-        tile.style.setProperty("--mag-x", `${directionX * attraction}px`);
-        tile.style.setProperty("--mag-y", `${directionY * attraction}px`);
-        tile.style.setProperty("--mag-rx", `${-localY * pull * 1.5}deg`);
-        tile.style.setProperty("--mag-ry", `${localX * pull * 1.5}deg`);
-        tile.style.setProperty("--mag-skew", `${localX * pull * 0.7}deg`);
-        tile.style.setProperty("--mag-scale-x", `${1 + pull * (0.014 + Math.abs(localX) * 0.006)}`);
-        tile.style.setProperty("--mag-scale-y", `${1 + pull * (0.01 + Math.abs(localY) * 0.006)}`);
+        surface.style.setProperty("--mag-x", `${directionX * attraction}px`);
+        surface.style.setProperty("--mag-y", `${directionY * attraction}px`);
+        surface.style.setProperty("--mag-rx", `${-localY * pull * 1.5}deg`);
+        surface.style.setProperty("--mag-ry", `${localX * pull * 1.5}deg`);
+        surface.style.setProperty("--mag-skew", `${localX * pull * 0.7}deg`);
+        surface.style.setProperty("--mag-scale-x", `${1 + pull * (0.014 + Math.abs(localX) * 0.006)}`);
+        surface.style.setProperty("--mag-scale-y", `${1 + pull * (0.01 + Math.abs(localY) * 0.006)}`);
       }
     };
 
@@ -136,11 +138,11 @@ export default function Home() {
       if (!animationFrame) animationFrame = window.requestAnimationFrame(renderPull);
     };
 
-    window.addEventListener("pointermove", trackPull, { passive: true });
+    document.addEventListener("mousemove", trackPull, { passive: true });
     window.addEventListener("blur", reset);
     document.documentElement.addEventListener("mouseleave", reset);
     return () => {
-      window.removeEventListener("pointermove", trackPull);
+      document.removeEventListener("mousemove", trackPull);
       window.removeEventListener("blur", reset);
       document.documentElement.removeEventListener("mouseleave", reset);
       if (animationFrame) window.cancelAnimationFrame(animationFrame);

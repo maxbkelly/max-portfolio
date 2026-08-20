@@ -19,13 +19,12 @@ nav button:hover::after { right: 0; }
 @keyframes grain { 0% { transform: translate(0,0) } 25% { transform: translate(3%,-2%) } 50% { transform: translate(-2%,3%) } 75% { transform: translate(2%,2%) } }
 .eyebrow { font-size: 10px; letter-spacing: .22em; margin: 0 0 20px; }
 .work { min-height: 100vh; padding: 120px 3vw 170px; }
-.grid { display: grid; grid-template-columns: repeat(3, 26%); justify-content: space-between; column-gap: 0; row-gap: 9vw; }
+.grid { display: grid; grid-template-columns: repeat(3, 26%); justify-content: space-between; column-gap: 0; row-gap: 7.2vw; }
 .project-tile { --mag-x: 0px; --mag-y: 0px; --mag-rx: 0deg; --mag-ry: 0deg; --mag-skew: 0deg; --mag-scale-x: 1; --mag-scale-y: 1; }
 .tile-hit { display: block; width: 100%; aspect-ratio: 1; position: relative; overflow: hidden; background: var(--accent); padding: 0; transform: perspective(900px) translate3d(var(--mag-x), var(--mag-y), 0) rotateX(var(--mag-rx)) rotateY(var(--mag-ry)) skewX(var(--mag-skew)) scale3d(var(--mag-scale-x), var(--mag-scale-y), 1); transform-style: preserve-3d; transform-origin: center; transition: transform .2s cubic-bezier(.16,.75,.25,1); will-change: transform; }
 .tile-hit iframe { position: absolute; top: 50%; left: 50%; width: 177.78%; height: 100%; border: 0; transform: translate(-50%, -50%) scale(1.02); pointer-events: none; filter: saturate(.65) contrast(1.05); transition: transform .8s cubic-bezier(.2,.7,.2,1), filter .4s; }
 .project-tile:hover iframe { transform: translate(-50%, -50%) scale(1.07); filter: saturate(1); }
 .tile-shade { position: absolute; inset: 0; background: linear-gradient(0deg, rgba(0,0,0,.4), transparent 50%); }
-.tile-index { position: absolute; top: 22px; left: 22px; font-size: 16px; font-stretch: condensed; font-weight: 400; letter-spacing: .12em; }
 .tile-cursor { position: fixed; z-index: 30; top: 0; left: 0; margin-left: 27px; color: #fff; font-size: 16px; font-stretch: condensed; font-weight: 400; letter-spacing: .12em; line-height: 1; opacity: 0; pointer-events: none; text-shadow: 0 1px 4px rgba(0,0,0,.8); transition: opacity .12s; white-space: nowrap; }
 .tile-cursor.visible { opacity: 1; }
 .tile-meta { padding-top: 15px; border-top: 1px solid #3a3936; margin-top: 12px; }
