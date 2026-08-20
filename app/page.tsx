@@ -77,8 +77,10 @@ export default function Home() {
   const [showWork, setShowWork] = useState(false);
   const [viewerPlaying, setViewerPlaying] = useState(false);
   const [viewerAtEdge, setViewerAtEdge] = useState(false);
+  const [viewerDimensions, setViewerDimensions] = useState({ width: 16, height: 9 });
   const [cursor, setCursor] = useState({ x: 0, y: 0, visible: false });
   const viewerFrame = useRef<HTMLIFrameElement>(null);
+  const viewerMedia = useRef<HTMLDivElement>(null);
   const gridRef = useRef<HTMLDivElement>(null);
   const visible = projects.filter((project) => project.category === category);
 
@@ -164,6 +166,38 @@ export default function Home() {
     viewerFrame.current?.contentWindow?.postMessage({ method }, "https://player.vimeo.com");
   }, []);
 
+  const requestViewerDimensions = useCallback(() => {
+    const player = viewerFrame.current?.contentWindow;
+    player?.postMessage({ method: "getVideoWidth" }, "https://player.vimeo.com");
+    player?.postMessage({ method: "getVideoHeight" }, "https://player.vimeo.com");
+  }, []);
+
+  useEffect(() => {
+    if (viewerIndex === null) return;
+    setViewerDimensions({ width: 16, height: 9 });
+
+    const receive = (event: MessageEvent) => {
+      if (event.origin !== "https://player.vimeo.com" || event.source !== viewerFrame.current?.contentWindow) return;
+      try {
+        const data = typeof event.data === "string" ? JSON.parse(event.data) : event.data;
+        if (data?.event === "ready") requestViewerDimensions();
+        if (data?.method === "getVideoWidth" && Number.isFinite(data.value)) {
+          setViewerDimensions((dimensions) => ({ ...dimensions, width: data.value }));
+        }
+        if (data?.method === "getVideoHeight" && Number.isFinite(data.value)) {
+          setViewerDimensions((dimensions) => ({ ...dimensions, height: data.value }));
+        }
+      } catch { /* Ignore unrelated player messages. */ }
+    };
+
+    const retry = window.setTimeout(requestViewerDimensions, 500);
+    window.addEventListener("message", receive);
+    return () => {
+      window.clearTimeout(retry);
+      window.removeEventListener("message", receive);
+    };
+  }, [viewerIndex, requestViewerDimensions]);
+
   const toggleViewer = useCallback(() => {
     if (viewerPlaying) {
       sendToViewer("pause");
@@ -190,9 +224,29 @@ export default function Home() {
   }, [viewerIndex, close, move, toggleViewer]);
 
   const trackViewerCursor = (event: React.MouseEvent<HTMLDivElement>) => {
-    const edgeX = window.innerWidth * 0.09;
-    const edgeY = window.innerHeight * 0.09;
-    const atEdge = event.clientX < edgeX || event.clientX > window.innerWidth - edgeX || event.clientY < edgeY || event.clientY > window.innerHeight - edgeY;
+    const edgeX = window.innerWidth * 0.16;
+    const edgeY = window.innerHeight * 0.13;
+    let atEdge = event.clientX < edgeX || event.clientX > window.innerWidth - edgeX || event.clientY < edgeY || event.clientY > window.innerHeight - edgeY;
+    const bounds = viewerMedia.current?.getBoundingClientRect();
+    const videoAspect = viewerDimensions.width / viewerDimensions.height;
+
+    if (bounds && Number.isFinite(videoAspect) && videoAspect > 0) {
+      const containerAspect = bounds.width / bounds.height;
+      const innerTrigger = Math.min(48, window.innerWidth * 0.03);
+
+      if (videoAspect < containerAspect) {
+        const videoWidth = bounds.height * videoAspect;
+        const videoLeft = bounds.left + (bounds.width - videoWidth) / 2;
+        const videoRight = videoLeft + videoWidth;
+        atEdge ||= event.clientX < videoLeft + innerTrigger || event.clientX > videoRight - innerTrigger;
+      } else if (videoAspect > containerAspect) {
+        const videoHeight = bounds.width / videoAspect;
+        const videoTop = bounds.top + (bounds.height - videoHeight) / 2;
+        const videoBottom = videoTop + videoHeight;
+        atEdge ||= event.clientY < videoTop + innerTrigger || event.clientY > videoBottom - innerTrigger;
+      }
+    }
+
     setViewerAtEdge(atEdge);
     setCursor({ x: event.clientX, y: event.clientY, visible: true });
   };
@@ -247,7 +301,7 @@ export default function Home() {
           onMouseLeave={() => setCursor((position) => ({ ...position, visible: false }))}
           onClick={() => viewerAtEdge ? close() : toggleViewer()}
         >
-          <div className="viewer-media">
+          <div className="viewer-media" ref={viewerMedia}>
             <iframe
               ref={viewerFrame}
               key={current.id}
@@ -255,6 +309,7 @@ export default function Home() {
               title={current.title}
               allow="autoplay; fullscreen; picture-in-picture"
               allowFullScreen
+              onLoad={requestViewerDimensions}
             />
           </div>
           <div className="viewer-top"><span>{current.title}</span><button className="viewer-mobile-close" onClick={(event) => { event.stopPropagation(); close(); }} aria-label="Close video">CLOSE ×</button></div>
