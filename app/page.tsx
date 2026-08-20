@@ -67,7 +67,6 @@ function VideoTile({ project, onOpen }: { project: Project; onOpen: () => void }
       </span>
       <div className="tile-meta">
         <h3>{project.title}</h3>
-        <p>{project.client} <span>{project.year}</span></p>
       </div>
     </article>
   );
@@ -81,7 +80,65 @@ export default function Home() {
   const [viewerAtEdge, setViewerAtEdge] = useState(false);
   const [cursor, setCursor] = useState({ x: 0, y: 0, visible: false });
   const viewerFrame = useRef<HTMLIFrameElement>(null);
+  const gridRef = useRef<HTMLDivElement>(null);
   const visible = projects.filter((project) => project.category === category);
+
+  useEffect(() => {
+    const grid = gridRef.current;
+    if (!grid || !window.matchMedia("(pointer: fine)").matches || window.matchMedia("(prefers-reduced-motion: reduce)").matches) return;
+
+    const tiles = Array.from(grid.querySelectorAll<HTMLElement>(".project-tile"));
+    let animationFrame = 0;
+    let pointerX = -1000;
+    let pointerY = -1000;
+
+    const reset = () => {
+      for (const tile of tiles) {
+        tile.style.setProperty("--mag-x", "0px");
+        tile.style.setProperty("--mag-y", "0px");
+        tile.style.setProperty("--mag-rx", "0deg");
+        tile.style.setProperty("--mag-ry", "0deg");
+        tile.style.setProperty("--mag-skew", "0deg");
+        tile.style.setProperty("--mag-scale", "1");
+      }
+    };
+
+    const renderPull = () => {
+      animationFrame = 0;
+      const gridBounds = grid.getBoundingClientRect();
+      for (const tile of tiles) {
+        const centerX = gridBounds.left + tile.offsetLeft + tile.offsetWidth / 2;
+        const centerY = gridBounds.top + tile.offsetTop + tile.offsetHeight / 2;
+        const dx = pointerX - centerX;
+        const dy = pointerY - centerY;
+        const distance = Math.hypot(dx, dy);
+        const pull = Math.pow(Math.max(0, 1 - distance / 430), 2);
+        tile.style.setProperty("--mag-x", `${dx * pull * 0.035}px`);
+        tile.style.setProperty("--mag-y", `${dy * pull * 0.035}px`);
+        tile.style.setProperty("--mag-rx", `${-dy * pull * 0.006}deg`);
+        tile.style.setProperty("--mag-ry", `${dx * pull * 0.006}deg`);
+        tile.style.setProperty("--mag-skew", `${dx * pull * 0.0018}deg`);
+        tile.style.setProperty("--mag-scale", `${1 + pull * 0.012}`);
+      }
+    };
+
+    const trackPull = (event: MouseEvent) => {
+      pointerX = event.clientX;
+      pointerY = event.clientY;
+      if (!animationFrame) animationFrame = window.requestAnimationFrame(renderPull);
+    };
+
+    window.addEventListener("mousemove", trackPull, { passive: true });
+    window.addEventListener("blur", reset);
+    document.documentElement.addEventListener("mouseleave", reset);
+    return () => {
+      window.removeEventListener("mousemove", trackPull);
+      window.removeEventListener("blur", reset);
+      document.documentElement.removeEventListener("mouseleave", reset);
+      if (animationFrame) window.cancelAnimationFrame(animationFrame);
+      reset();
+    };
+  }, [category]);
 
   const close = useCallback(() => {
     setViewerIndex(null);
@@ -159,14 +216,7 @@ export default function Home() {
       </section>
 
       <section id="work" className={`work ${showWork ? "revealed" : ""}`}>
-        <div className="section-head">
-          <p>SELECTED WORK</p>
-          <div className="category-tabs">
-            {categories.map((item) => <button className={category === item ? "active" : ""} key={item} onClick={() => setCategory(item)}>{item}</button>)}
-          </div>
-          <span>{String(visible.length).padStart(2, "0")} FILMS</span>
-        </div>
-        <div className="grid">
+        <div className="grid" ref={gridRef}>
           {visible.map((project, index) => <VideoTile key={project.id} project={project} onOpen={() => setViewerIndex(index)} />)}
         </div>
       </section>

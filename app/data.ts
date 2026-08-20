@@ -3,8 +3,6 @@ export type Category = "DIRECTOR" | "EDITOR" | "A.I.";
 export type Project = {
   id: string;
   title: string;
-  client: string;
-  year: string;
   category: Category;
   vimeoId: string;
   vimeoHash?: string;
@@ -45,8 +43,6 @@ export const projects: Project[] = categories.flatMap((category) =>
     return {
       id: `${category.toLowerCase().replaceAll(".", "")}-${index + 1}`,
       title: source.title,
-      client: "Selected Work",
-      year: "",
       category,
       vimeoId: source.vimeoId,
       ...(source.vimeoHash ? { vimeoHash: source.vimeoHash } : {}),
