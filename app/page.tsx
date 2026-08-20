@@ -69,12 +69,35 @@ export default function Home() {
   const [category, setCategory] = useState<Category>("DIRECTOR");
   const [viewerIndex, setViewerIndex] = useState<number | null>(null);
   const [showWork, setShowWork] = useState(false);
+  const [viewerPlaying, setViewerPlaying] = useState(false);
+  const [viewerAtEdge, setViewerAtEdge] = useState(false);
+  const [cursor, setCursor] = useState({ x: 0, y: 0, visible: false });
+  const viewerFrame = useRef<HTMLIFrameElement>(null);
   const visible = projects.filter((project) => project.category === category);
 
-  const close = useCallback(() => setViewerIndex(null), []);
+  const close = useCallback(() => {
+    setViewerIndex(null);
+    setViewerPlaying(false);
+  }, []);
   const move = useCallback((direction: number) => {
+    setViewerPlaying(false);
+    setViewerAtEdge(false);
     setViewerIndex((current) => current === null ? null : (current + direction + visible.length) % visible.length);
   }, [visible.length]);
+
+  const sendToViewer = useCallback((method: "play" | "pause") => {
+    viewerFrame.current?.contentWindow?.postMessage({ method }, "https://player.vimeo.com");
+  }, []);
+
+  const toggleViewer = useCallback(() => {
+    if (viewerPlaying) {
+      sendToViewer("pause");
+      setViewerPlaying(false);
+    } else {
+      sendToViewer("play");
+      setViewerPlaying(true);
+    }
+  }, [sendToViewer, viewerPlaying]);
 
   useEffect(() => {
     const onKey = (event: KeyboardEvent) => {
@@ -82,10 +105,22 @@ export default function Home() {
       if (event.key === "Escape") close();
       if (event.key === "ArrowLeft") move(-1);
       if (event.key === "ArrowRight") move(1);
+      if (event.key === " ") {
+        event.preventDefault();
+        toggleViewer();
+      }
     };
     window.addEventListener("keydown", onKey);
     return () => window.removeEventListener("keydown", onKey);
-  }, [viewerIndex, close, move]);
+  }, [viewerIndex, close, move, toggleViewer]);
+
+  const trackViewerCursor = (event: React.MouseEvent<HTMLDivElement>) => {
+    const edgeX = window.innerWidth * 0.09;
+    const edgeY = window.innerHeight * 0.09;
+    const atEdge = event.clientX < edgeX || event.clientX > window.innerWidth - edgeX || event.clientY < edgeY || event.clientY > window.innerHeight - edgeY;
+    setViewerAtEdge(atEdge);
+    setCursor({ x: event.clientX, y: event.clientY, visible: true });
+  };
 
   const choose = (next: Category) => {
     setCategory(next);
@@ -135,18 +170,36 @@ export default function Home() {
       </section>
 
       {current && (
-        <div className="viewer" role="dialog" aria-modal="true" aria-label={`${current.title} video player`}>
-          <iframe
-            key={current.id}
-            src={`https://player.vimeo.com/video/${current.vimeoId}?${current.vimeoHash ? `h=${current.vimeoHash}&` : ""}autoplay=1&title=0&byline=0&portrait=0&dnt=1`}
-            title={current.title}
-            allow="autoplay; fullscreen; picture-in-picture"
-            allowFullScreen
-          />
-          <div className="viewer-top"><span>{current.title} — {current.client}</span><button onClick={close} aria-label="Close video">CLOSE ×</button></div>
-          <button className="viewer-arrow previous" onClick={() => move(-1)} aria-label="Previous project">←</button>
-          <button className="viewer-arrow next" onClick={() => move(1)} aria-label="Next project">→</button>
+        <div
+          className={`viewer ${viewerAtEdge ? "at-edge" : ""}`}
+          role="dialog"
+          aria-modal="true"
+          aria-label={`${current.title} video player`}
+          onMouseMove={trackViewerCursor}
+          onMouseLeave={() => setCursor((position) => ({ ...position, visible: false }))}
+          onClick={() => viewerAtEdge ? close() : toggleViewer()}
+        >
+          <div className="viewer-media">
+            <iframe
+              ref={viewerFrame}
+              key={current.id}
+              src={`https://player.vimeo.com/video/${current.vimeoId}?${current.vimeoHash ? `h=${current.vimeoHash}&` : ""}autoplay=0&controls=0&title=0&byline=0&portrait=0&dnt=1`}
+              title={current.title}
+              allow="autoplay; fullscreen; picture-in-picture"
+              allowFullScreen
+            />
+          </div>
+          <div className="viewer-top"><span>{current.title}</span><button className="viewer-mobile-close" onClick={(event) => { event.stopPropagation(); close(); }} aria-label="Close video">CLOSE ×</button></div>
+          <button className="viewer-arrow previous" onClick={(event) => { event.stopPropagation(); move(-1); }} aria-label="Previous project">←</button>
+          <button className="viewer-arrow next" onClick={(event) => { event.stopPropagation(); move(1); }} aria-label="Next project">→</button>
           <div className="viewer-count">{String(viewerIndex! + 1).padStart(2, "0")} / {String(visible.length).padStart(2, "0")}</div>
+          <span
+            className={`viewer-cursor ${cursor.visible ? "visible" : ""}`}
+            style={{ transform: `translate3d(${cursor.x}px, ${cursor.y}px, 0) translate(-50%, -50%)` }}
+            aria-hidden="true"
+          >
+            {viewerAtEdge ? "CLOSE" : viewerPlaying ? "PAUSE" : "PLAY"}
+          </span>
         </div>
       )}
     </main>
