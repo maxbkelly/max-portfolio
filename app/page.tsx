@@ -195,7 +195,7 @@ export default function Home() {
           <div className="viewer-count">{String(viewerIndex! + 1).padStart(2, "0")} / {String(visible.length).padStart(2, "0")}</div>
           <span
             className={`viewer-cursor ${cursor.visible ? "visible" : ""}`}
-            style={{ transform: `translate3d(${cursor.x}px, ${cursor.y}px, 0) translate(-50%, -50%)` }}
+            style={{ transform: `translate3d(${cursor.x}px, ${cursor.y}px, 0) translateY(-50%)` }}
             aria-hidden="true"
           >
             {viewerAtEdge ? "CLOSE" : viewerPlaying ? "PAUSE" : "PLAY"}
