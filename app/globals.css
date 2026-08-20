@@ -30,7 +30,8 @@ nav button:hover::after { right: 0; }
 .project-tile:hover iframe { transform: translate(-50%, -50%) scale(1.07); filter: saturate(1); }
 .tile-shade { position: absolute; inset: 0; background: linear-gradient(0deg, rgba(0,0,0,.4), transparent 50%); }
 .tile-index { position: absolute; top: 18px; left: 18px; font-size: 8px; letter-spacing: .15em; }
-.play-mark { position: absolute; inset: 50% auto auto 50%; transform: translate(-50%,-50%); width: 62px; height: 62px; border-radius: 50%; border: 1px solid rgba(255,255,255,.7); display: grid; place-items: center; font-size: 8px; letter-spacing: .12em; backdrop-filter: blur(4px); }
+.tile-cursor { position: fixed; z-index: 30; top: 0; left: 0; margin-left: 27px; color: #fff; font-size: 18px; font-stretch: condensed; font-weight: 800; letter-spacing: .035em; line-height: 1; opacity: 0; pointer-events: none; text-shadow: 0 1px 4px rgba(0,0,0,.8); transition: opacity .12s; white-space: nowrap; }
+.tile-cursor.visible { opacity: 1; }
 .tile-meta { display: flex; align-items: baseline; justify-content: space-between; padding-top: 15px; border-top: 1px solid #3a3936; margin-top: 12px; }
 .tile-meta h3 { margin: 0; font-size: clamp(18px, 1.8vw, 30px); letter-spacing: -.035em; font-weight: 500; }
 .tile-meta p { margin: 0; font-size: 9px; letter-spacing: .1em; color: var(--muted); }
@@ -58,7 +59,7 @@ nav button:hover::after { right: 0; }
   .grid { grid-template-columns: 1fr; gap: 55px; }
   .tile-meta h3 { font-size: 30px; }.tile-meta p { font-size: 8px; }
   .about-bio { margin: 65px 0 0 auto; max-width: 90%; }
-  .viewer { cursor: default; }.viewer-top { font-size: 14px; }.viewer-mobile-close { display: block; font-size: 9px; letter-spacing: .12em; }.viewer-cursor { display: none; }
+  .tile-cursor { display: none; }.viewer { cursor: default; }.viewer-top { font-size: 14px; }.viewer-mobile-close { display: block; font-size: 9px; letter-spacing: .12em; }.viewer-cursor { display: none; }
 }
 @media (min-width: 701px) and (max-width: 980px) { .grid { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
 @media (prefers-reduced-motion: reduce) { *, *::before, *::after { scroll-behavior: auto !important; animation-duration: .01ms !important; transition-duration: .01ms !important; } }

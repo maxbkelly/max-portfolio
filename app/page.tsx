@@ -9,6 +9,7 @@ function VideoTile({ project, onOpen }: { project: Project; onOpen: () => void }
   const frame = useRef<HTMLIFrameElement>(null);
   const duration = useRef(60);
   const [active, setActive] = useState(false);
+  const [tileCursor, setTileCursor] = useState({ x: 0, y: 0 });
 
   const send = (method: string, value?: number) => {
     frame.current?.contentWindow?.postMessage(
@@ -32,6 +33,7 @@ function VideoTile({ project, onOpen }: { project: Project; onOpen: () => void }
   const scrub = (event: React.MouseEvent<HTMLElement>) => {
     const bounds = event.currentTarget.getBoundingClientRect();
     send("setCurrentTime", ((event.clientX - bounds.left) / bounds.width) * duration.current);
+    setTileCursor({ x: event.clientX, y: event.clientY });
   };
 
   return (
@@ -55,8 +57,14 @@ function VideoTile({ project, onOpen }: { project: Project; onOpen: () => void }
         />
         <span className="tile-shade" />
         <span className="tile-index">{project.category}</span>
-        <span className="play-mark" aria-hidden="true">{active ? "VIEW" : "▶"}</span>
       </button>
+      <span
+        className={`tile-cursor ${active ? "visible" : ""}`}
+        style={{ transform: `translate3d(${tileCursor.x}px, ${tileCursor.y}px, 0) translateY(-50%)` }}
+        aria-hidden="true"
+      >
+        PLAY
+      </span>
       <div className="tile-meta">
         <h3>{project.title}</h3>
         <p>{project.client} <span>{project.year}</span></p>
