@@ -77,7 +77,9 @@ export default function Home() {
   const [viewerPlaying, setViewerPlaying] = useState(false);
   const [viewerAtEdge, setViewerAtEdge] = useState(false);
   const [viewerDimensions, setViewerDimensions] = useState({ width: 16, height: 9 });
+  const [heroMuted, setHeroMuted] = useState(true);
   const [cursor, setCursor] = useState({ x: 0, y: 0, visible: false });
+  const heroFrame = useRef<HTMLIFrameElement>(null);
   const viewerFrame = useRef<HTMLIFrameElement>(null);
   const viewerMedia = useRef<HTMLDivElement>(null);
   const gridRef = useRef<HTMLDivElement>(null);
@@ -270,6 +272,19 @@ export default function Home() {
 
   const current = viewerIndex === null ? null : visible[viewerIndex];
 
+  const toggleHeroSound = () => {
+    const nextMuted = !heroMuted;
+    heroFrame.current?.contentWindow?.postMessage(
+      { method: "setMuted", value: nextMuted },
+      "https://player.vimeo.com",
+    );
+    heroFrame.current?.contentWindow?.postMessage(
+      { method: "setVolume", value: nextMuted ? 0 : 1 },
+      "https://player.vimeo.com",
+    );
+    setHeroMuted(nextMuted);
+  };
+
   return (
     <main>
       <header className="topbar">
@@ -282,12 +297,16 @@ export default function Home() {
 
       <section className="hero" aria-label="Featured reel">
         <iframe
+          ref={heroFrame}
           className="hero-video"
           src={`https://player.vimeo.com/video/${content.homepageReel.vimeoId}?${content.homepageReel.vimeoHash ? `h=${content.homepageReel.vimeoHash}&` : ""}background=1&autoplay=1&loop=1&muted=1&autopause=0&dnt=1`}
           title="Maximilian Kelly editors reel"
           allow="autoplay; fullscreen; picture-in-picture"
         />
         <div className="film-grain" />
+        <button className="hero-sound" type="button" onClick={toggleHeroSound}>
+          {heroMuted ? "SOUND ON" : "SOUND OFF"}
+        </button>
       </section>
 
       <section id="work" className={`work ${showWork ? "revealed" : ""}`}>
