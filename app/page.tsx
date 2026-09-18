@@ -1,9 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useRef, useState } from "react";
-import { projects, type Category, type Project } from "./data";
-
-const categories: Category[] = ["DIRECTOR", "EDITOR", "A.I."];
+import { fallbackContent, loadCmsContent, type Project } from "./data";
 
 function VideoTile({ project, onOpen }: { project: Project; onOpen: () => void }) {
   const frame = useRef<HTMLIFrameElement>(null);
@@ -72,7 +70,8 @@ function VideoTile({ project, onOpen }: { project: Project; onOpen: () => void }
 }
 
 export default function Home() {
-  const [category, setCategory] = useState<Category>("DIRECTOR");
+  const [content, setContent] = useState(fallbackContent);
+  const [category, setCategory] = useState(fallbackContent.sections[0].id);
   const [viewerIndex, setViewerIndex] = useState<number | null>(null);
   const [showWork, setShowWork] = useState(false);
   const [viewerPlaying, setViewerPlaying] = useState(false);
@@ -82,7 +81,19 @@ export default function Home() {
   const viewerFrame = useRef<HTMLIFrameElement>(null);
   const viewerMedia = useRef<HTMLDivElement>(null);
   const gridRef = useRef<HTMLDivElement>(null);
-  const visible = projects.filter((project) => project.category === category);
+  const activeSection = content.sections.find((section) => section.id === category) || content.sections[0];
+  const visible = activeSection?.projects || [];
+
+  useEffect(() => {
+    const controller = new AbortController();
+    loadCmsContent(controller.signal)
+      .then((nextContent) => {
+        setContent(nextContent);
+        setCategory((current) => nextContent.sections.some((section) => section.id === current) ? current : nextContent.sections[0].id);
+      })
+      .catch(() => { /* Keep the built-in content if Sanity is unavailable. */ });
+    return () => controller.abort();
+  }, []);
 
   useEffect(() => {
     const grid = gridRef.current;
@@ -150,7 +161,7 @@ export default function Home() {
       if (animationFrame) window.cancelAnimationFrame(animationFrame);
       reset();
     };
-  }, [category, showWork]);
+  }, [category, showWork, visible.length]);
 
   const close = useCallback(() => {
     setViewerIndex(null);
@@ -251,7 +262,7 @@ export default function Home() {
     setCursor({ x: event.clientX, y: event.clientY, visible: true });
   };
 
-  const choose = (next: Category) => {
+  const choose = (next: string) => {
     setCategory(next);
     setShowWork(true);
     requestAnimationFrame(() => document.querySelector("#work")?.scrollIntoView({ behavior: "smooth" }));
@@ -262,9 +273,9 @@ export default function Home() {
   return (
     <main>
       <header className="topbar">
-        <button className="wordmark" onClick={() => window.scrollTo({ top: 0, behavior: "smooth" })}>MAXIMILIAN KELLY</button>
+        <button className="wordmark" onClick={() => window.scrollTo({ top: 0, behavior: "smooth" })}>{content.siteTitle}</button>
         <nav aria-label="Main navigation">
-          {categories.map((item) => <button key={item} onClick={() => choose(item)}>{item}</button>)}
+          {content.sections.map((section) => <button key={section.id} onClick={() => choose(section.id)}>{section.title}</button>)}
           <button onClick={() => document.querySelector("#about")?.scrollIntoView({ behavior: "smooth" })}>ABOUT</button>
         </nav>
       </header>
@@ -272,7 +283,7 @@ export default function Home() {
       <section className="hero" aria-label="Featured reel">
         <iframe
           className="hero-video"
-          src="https://player.vimeo.com/video/1081978908?background=1&autoplay=1&loop=1&muted=1&autopause=0&dnt=1"
+          src={`https://player.vimeo.com/video/${content.homepageReel.vimeoId}?${content.homepageReel.vimeoHash ? `h=${content.homepageReel.vimeoHash}&` : ""}background=1&autoplay=1&loop=1&muted=1&autopause=0&dnt=1`}
           title="Maximilian Kelly editors reel"
           allow="autoplay; fullscreen; picture-in-picture"
         />
@@ -287,8 +298,8 @@ export default function Home() {
 
       <section id="about" className="about">
         <p className="eyebrow">ABOUT</p>
-        <p className="about-inspiration">My inspirations include ’90s skate videos, Lil Wayne’s “6 Foot 7 Foot” music video, and the films of Charlie Kaufman.</p>
-        <p className="about-bio">Originally from San Francisco, I lived in Amsterdam and then Minneapolis before moving to Chicago to obtain my degree in Post Production Cinema from Columbia College. Now living in LA, I’m focused on creating rhythm, pacing and mood through my projects.</p>
+        <p className="about-inspiration">{content.aboutLead}</p>
+        <p className="about-bio">{content.aboutBio}</p>
       </section>
 
       {current && (
