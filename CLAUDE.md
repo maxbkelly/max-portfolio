@@ -7,7 +7,7 @@ This repository is Maximilian Kelly's production portfolio. Preserve its cinemat
 - **Code and visual behavior:** GitHub changes made with Claude, reviewed, then deployed.
 - **Content:** Sanity Studio. Do not hardcode ordinary portfolio edits into React.
 - **Video files:** Vimeo. The CMS stores Vimeo URLs; this repository does not store source videos.
-- **Production hosting:** Cloudflare is planned but not configured yet.
+- **Production hosting:** Cloudflare Workers, deployed automatically from GitHub `main`.
 
 ## Architecture
 
@@ -16,7 +16,7 @@ This repository is Maximilian Kelly's production portfolio. Preserve its cinemat
 - `app/globals.css` contains the complete visual and motion system.
 - `studio/` is a standalone Sanity Studio linked to project `j7kkjji4`, dataset `production`.
 - `studio/schemaTypes/` defines Projects, Sections and Site Settings.
-- `.openai/hosting.json` and `build/sites-vite-plugin.ts` support the existing temporary review deployment. Preserve them until Cloudflare production hosting is working.
+- `.openai/hosting.json` and `build/sites-vite-plugin.ts` package hosting metadata during the Vinext build. Preserve them unless the build pipeline is deliberately replaced.
 
 ## Required behavior
 

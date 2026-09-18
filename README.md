@@ -56,7 +56,7 @@ See [HANDOFF.md](HANDOFF.md) for the plain-English operating guide and [CLAUDE.m
 - Sanity project: `j7kkjji4`
 - Sanity dataset: `production`
 - Sanity Studio: <https://maxbkelly-portfolio.sanity.studio/>
-- Temporary review site: <https://maximilian-kelly-portfolio.albert3kelly.chatgpt.site/>
+- Production site: <https://maximilian-kelly-portfolio.maximilianbkelly.workers.dev/>
 - GitHub: <https://github.com/maxbkelly/max-portfolio>
 
-The temporary review site is not the intended permanent host. Cloudflare deployment is the next infrastructure step after the GitHub handoff.
+Cloudflare automatically builds and deploys the production site from GitHub `main`. A custom domain can be attached later without changing the application architecture.

@@ -36,7 +36,7 @@ Upload and manage the actual videos in Vimeo. Sanity only needs the Vimeo link. 
 
 ### Cloudflare: final website hosting
 
-Cloudflare will publish the website and eventually manage the domain. It is not connected to this GitHub repository yet. Until that setup is complete, the current `chatgpt.site` address is a temporary review site.
+Cloudflare publishes the website at <https://maximilian-kelly-portfolio.maximilianbkelly.workers.dev/> and is connected to the GitHub repository. Every approved change merged into `main` is built and deployed automatically. A custom domain can be connected later.
 
 ## Max's normal workflow
 
@@ -66,5 +66,6 @@ The GitHub, Sanity, Cloudflare, Vimeo and domain accounts should use Max's email
 - Sanity is connected and contains the starting portfolio content.
 - The website code can read Site Settings, Sections and Projects from Sanity.
 - The CMS has a hosted login address.
-- GitHub is the intended master code repository.
-- Cloudflare connection and the final custom domain remain to be completed.
+- GitHub is the master code repository.
+- Cloudflare deployment is connected and live.
+- A final custom domain remains optional.

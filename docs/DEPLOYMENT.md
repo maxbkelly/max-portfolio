@@ -2,29 +2,32 @@
 
 ## Current state
 
-The review build is currently hosted through ChatGPT Sites at:
+The production build is hosted on Cloudflare Workers at:
 
-<https://maximilian-kelly-portfolio.albert3kelly.chatgpt.site/>
+<https://maximilian-kelly-portfolio.maximilianbkelly.workers.dev/>
 
 Sanity Studio is independently hosted at:
 
 <https://maxbkelly-portfolio.sanity.studio/>
 
-## Intended production state
+## Production setup
 
 1. GitHub `main` is the source of truth.
 2. Cloudflare connects to the GitHub repository.
 3. A successful production build deploys automatically after an approved merge to `main`.
-4. The custom domain points to that Cloudflare deployment.
+4. A custom domain can point to that Cloudflare deployment later.
 5. Sanity remains independent; published content updates should not require a GitHub commit.
 
-## Before connecting Cloudflare
+## Cloudflare build configuration
 
-- Confirm the repository belongs to Max and is private.
-- Give Cloudflare access only to this repository.
-- Preserve the current review deployment until the Cloudflare URL is verified.
-- Add the final Cloudflare and custom-domain origins to Sanity CORS if browser-side content requests are used.
-- Never copy GitHub, Sanity or Cloudflare credentials into repository files.
+- Worker name: `maximilian-kelly-portfolio`
+- Production branch: `main`
+- Build command: `npm run build`
+- Deploy command: `npx wrangler deploy --config dist/server/wrangler.json`
+- Preview deploy command: `npx wrangler versions upload --config dist/server/wrangler.json`
+- Repository root: `/`
+
+The Workers address is registered in Sanity CORS without credentials. Add any future custom-domain origin to Sanity CORS too. Never copy GitHub, Sanity or Cloudflare credentials into repository files.
 
 ## Build checks
 
@@ -33,4 +36,4 @@ npm run build
 npm run cms:build
 ```
 
-The current app uses Vinext and the Cloudflare Vite plugin. When configuring the permanent Cloudflare deployment, Claude should verify the current recommended Workers/Pages configuration rather than assuming the temporary ChatGPT Sites settings are portable unchanged.
+The app uses Vinext and the Cloudflare Vite plugin. Cloudflare builds the Worker bundle and static assets into `dist/`, then deploys using the generated `dist/server/wrangler.json` configuration.
