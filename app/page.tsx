@@ -6,8 +6,11 @@ import { fallbackContent, loadCmsContent, type Project } from "./data";
 function VideoTile({ project, onOpen }: { project: Project; onOpen: () => void }) {
   const frame = useRef<HTMLIFrameElement>(null);
   const duration = useRef(60);
+  const dimensions = useRef<{ width?: number; height?: number }>({});
+  const dimensionPoll = useRef<ReturnType<typeof setInterval> | null>(null);
   const [active, setActive] = useState(false);
   const [tileCursor, setTileCursor] = useState({ x: 0, y: 0 });
+  const [videoAspect, setVideoAspect] = useState<number | null>(null);
 
   const send = (method: string, value?: number) => {
     frame.current?.contentWindow?.postMessage(
@@ -16,17 +19,56 @@ function VideoTile({ project, onOpen }: { project: Project; onOpen: () => void }
     );
   };
 
+  const stopDimensionPoll = () => {
+    if (dimensionPoll.current) {
+      clearInterval(dimensionPoll.current);
+      dimensionPoll.current = null;
+    }
+  };
+
+  // The Vimeo player iframe fires its own "load" before the player app
+  // inside has finished initializing, so a dimensions request sent right
+  // then can arrive before anything is listening and gets dropped silently.
+  // Retry for a few seconds instead of asking once.
+  const requestDimensions = () => {
+    if (dimensions.current.width && dimensions.current.height) {
+      stopDimensionPoll();
+      return;
+    }
+    send("getVideoWidth");
+    send("getVideoHeight");
+  };
+
   useEffect(() => {
     const receive = (event: MessageEvent) => {
       if (event.origin !== "https://player.vimeo.com" || event.source !== frame.current?.contentWindow) return;
       try {
         const data = typeof event.data === "string" ? JSON.parse(event.data) : event.data;
         if (data?.method === "getDuration" && Number.isFinite(data.value)) duration.current = data.value;
+        if (data?.method === "getVideoWidth" && Number.isFinite(data.value)) dimensions.current.width = data.value;
+        if (data?.method === "getVideoHeight" && Number.isFinite(data.value)) dimensions.current.height = data.value;
+        if (dimensions.current.width && dimensions.current.height) {
+          setVideoAspect(dimensions.current.width / dimensions.current.height);
+          stopDimensionPoll();
+        }
       } catch { /* Ignore unrelated player messages. */ }
     };
     window.addEventListener("message", receive);
-    return () => window.removeEventListener("message", receive);
+    return () => {
+      window.removeEventListener("message", receive);
+      stopDimensionPoll();
+    };
   }, []);
+
+  // Covers the square tile regardless of the source video's orientation, the
+  // same math as CSS background-size: cover, applied to the iframe box.
+  // Falls back to the 16:9 default (matching the stylesheet) until the
+  // player reports the real dimensions.
+  const coverStyle = videoAspect
+    ? videoAspect >= 1
+      ? { width: `${videoAspect * 100}%`, height: "100%" }
+      : { width: "100%", height: `${(1 / videoAspect) * 100}%` }
+    : undefined;
 
   const scrub = (event: React.MouseEvent<HTMLElement>) => {
     const bounds = event.currentTarget.getBoundingClientRect();
@@ -51,7 +93,14 @@ function VideoTile({ project, onOpen }: { project: Project; onOpen: () => void }
           src={`https://player.vimeo.com/video/${project.vimeoId}?${project.vimeoHash ? `h=${project.vimeoHash}&` : ""}autoplay=0&muted=1&loop=1&controls=0&title=0&byline=0&portrait=0&dnt=1`}
           title={`${project.title} preview`}
           allow="autoplay; fullscreen; picture-in-picture"
-          onLoad={() => send("getDuration")}
+          style={coverStyle}
+          onLoad={() => {
+            send("getDuration");
+            requestDimensions();
+            stopDimensionPoll();
+            dimensionPoll.current = setInterval(requestDimensions, 250);
+            setTimeout(stopDimensionPoll, 4000);
+          }}
         />
         <span className="tile-shade" />
       </button>
