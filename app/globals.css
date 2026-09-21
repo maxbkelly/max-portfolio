@@ -26,6 +26,8 @@ nav button:hover::after { right: 0; }
 .tile-hit { display: block; width: 100%; aspect-ratio: 1; position: relative; overflow: hidden; background: var(--accent); padding: 0; }
 .tile-hit iframe { position: absolute; top: 50%; left: 50%; width: 177.78%; height: 100%; border: 0; transform: translate(-50%, -50%) scale(1.02); pointer-events: none; transition: transform .8s cubic-bezier(.2,.7,.2,1); }
 .project-tile:hover iframe { transform: translate(-50%, -50%) scale(1.07); }
+.tile-thumbnail { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: cover; pointer-events: none; transition: opacity .4s; }
+.tile-thumbnail.hidden { opacity: 0; }
 .tile-shade { position: absolute; inset: 0; background: linear-gradient(0deg, rgba(0,0,0,.4), transparent 50%); }
 .tile-cursor { position: fixed; z-index: 30; top: 0; left: 0; margin-left: 27px; color: #fff; font-size: 16px; font-stretch: condensed; font-weight: 400; letter-spacing: .12em; line-height: 1; opacity: 0; pointer-events: none; text-shadow: 0 1px 4px rgba(0,0,0,.8); transition: opacity .12s; white-space: nowrap; }
 .tile-cursor.visible { opacity: 1; }

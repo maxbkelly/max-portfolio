@@ -102,6 +102,9 @@ function VideoTile({ project, onOpen }: { project: Project; onOpen: () => void }
             setTimeout(stopDimensionPoll, 4000);
           }}
         />
+        {project.thumbnailUrl && (
+          <img src={project.thumbnailUrl} alt="" className={`tile-thumbnail ${active ? "hidden" : ""}`} />
+        )}
         <span className="tile-shade" />
       </button>
       <span

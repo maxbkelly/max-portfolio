@@ -32,6 +32,13 @@ export const projectType = defineType({
       validation: (Rule) => Rule.required().uri({scheme: ["http", "https"]}),
     }),
     defineField({
+      name: "thumbnail",
+      title: "Custom thumbnail",
+      description: "Optional. Shown in the grid instead of the video's own frame; hovering still plays the video preview as usual. Leave blank to keep showing the video frame.",
+      type: "image",
+      options: {hotspot: true},
+    }),
+    defineField({
       name: "description",
       title: "Description",
       type: "text",
@@ -64,6 +71,6 @@ export const projectType = defineType({
     }),
   ],
   preview: {
-    select: {title: "title", subtitle: "vimeoUrl"},
+    select: {title: "title", subtitle: "vimeoUrl", media: "thumbnail"},
   },
 });
