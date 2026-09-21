@@ -7,9 +7,22 @@ export const projectType = defineType({
   fields: [
     defineField({
       name: "title",
-      title: "Project name",
+      title: "Fallback title",
+      description: "Used everywhere (browser tab, video alt text) until Client and Project name below are both filled in — then those replace it under the thumbnail.",
       type: "string",
       validation: (Rule) => Rule.required(),
+    }),
+    defineField({
+      name: "client",
+      title: "Client",
+      description: "Shown on the left under the thumbnail. Leave this and Project name blank to keep showing the Fallback title instead.",
+      type: "string",
+    }),
+    defineField({
+      name: "projectName",
+      title: "Project name",
+      description: "Shown on the right under the thumbnail.",
+      type: "string",
     }),
     defineField({
       name: "vimeoUrl",

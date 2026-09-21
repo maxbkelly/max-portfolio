@@ -7,6 +7,8 @@ export type Project = {
   id: string;
   sourceId: string;
   title: string;
+  client?: string;
+  projectName?: string;
   vimeoId: string;
   vimeoHash?: string;
   accent: string;
@@ -99,7 +101,7 @@ const query = `*[_type == "siteSettings" && _id == "siteSettings"][0]{
       enabled,
       "projects": projects[]{
         "placementId": _key,
-        ...@->{_id, title, vimeoUrl, accent, credits}
+        ...@->{_id, title, client, projectName, vimeoUrl, accent, credits}
       }
     }
   }
@@ -121,6 +123,8 @@ type SanityResponse = {
         placementId?: string;
         _id?: string;
         title?: string;
+        client?: string;
+        projectName?: string;
         vimeoUrl?: string;
         accent?: string;
         credits?: Credit[];
@@ -151,6 +155,7 @@ export async function loadCmsContent(signal?: AbortSignal): Promise<PortfolioCon
           sourceId: project._id,
           title: project.title,
           accent: project.accent || "#827c71",
+          ...(project.client && project.projectName ? {client: project.client, projectName: project.projectName} : {}),
           ...(project.credits?.length ? {credits: project.credits} : {}),
           ...video,
         }];

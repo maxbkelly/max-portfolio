@@ -112,7 +112,11 @@ function VideoTile({ project, onOpen }: { project: Project; onOpen: () => void }
         PLAY
       </span>
       <div className="tile-meta">
-        <h3>{project.title}</h3>
+        {project.client && project.projectName ? (
+          <h3 className="tile-meta-split"><span>{project.client}</span><span>{project.projectName}</span></h3>
+        ) : (
+          <h3>{project.title}</h3>
+        )}
       </div>
     </article>
   );
