@@ -326,9 +326,9 @@ export default function Home() {
           <button className="viewer-arrow previous" onClick={(event) => { event.stopPropagation(); move(-1); }} aria-label="Previous project">←</button>
           <button className="viewer-arrow next" onClick={(event) => { event.stopPropagation(); move(1); }} aria-label="Next project">→</button>
           {current.credits?.length ? (
-            <div className="viewer-credit">{current.credits.map((credit) => `${credit.label} by ${credit.value}`).join(" · ")}</div>
+            <div className={`viewer-credit ${viewerPlaying ? "faded" : ""}`}>{current.credits.map((credit) => `${credit.label} by ${credit.value}`).join(" · ")}</div>
           ) : null}
-          <div className="viewer-count">{String(viewerIndex! + 1).padStart(2, "0")} / {String(visible.length).padStart(2, "0")}</div>
+          <div className={`viewer-count ${viewerPlaying ? "faded" : ""}`}>{String(viewerIndex! + 1).padStart(2, "0")} / {String(visible.length).padStart(2, "0")}</div>
           <span
             className={`viewer-cursor ${cursor.visible ? "visible" : ""}`}
             style={{ transform: `translate3d(${cursor.x}px, ${cursor.y}px, 0) translateY(-50%)` }}
