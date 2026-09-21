@@ -131,7 +131,6 @@ export default function Home() {
   const heroFrame = useRef<HTMLIFrameElement>(null);
   const viewerFrame = useRef<HTMLIFrameElement>(null);
   const viewerMedia = useRef<HTMLDivElement>(null);
-  const gridRef = useRef<HTMLDivElement>(null);
   const activeSection = content.sections.find((section) => section.id === category) || content.sections[0];
   const visible = activeSection?.projects || [];
 
@@ -145,74 +144,6 @@ export default function Home() {
       .catch(() => { /* Keep the built-in content if Sanity is unavailable. */ });
     return () => controller.abort();
   }, []);
-
-  useEffect(() => {
-    const grid = gridRef.current;
-    if (!grid) return;
-
-    const tiles = Array.from(grid.querySelectorAll<HTMLElement>(".project-tile")).map((wrapper) => ({
-      wrapper,
-      surface: wrapper.querySelector<HTMLElement>(".tile-hit"),
-    })).filter((tile): tile is { wrapper: HTMLElement; surface: HTMLElement } => Boolean(tile.surface));
-    let animationFrame = 0;
-    let pointerX = -1000;
-    let pointerY = -1000;
-
-    const reset = () => {
-      for (const { surface } of tiles) {
-        surface.style.setProperty("--mag-x", "0px");
-        surface.style.setProperty("--mag-y", "0px");
-        surface.style.setProperty("--mag-rx", "0deg");
-        surface.style.setProperty("--mag-ry", "0deg");
-        surface.style.setProperty("--mag-skew", "0deg");
-        surface.style.setProperty("--mag-scale-x", "1");
-        surface.style.setProperty("--mag-scale-y", "1");
-      }
-    };
-
-    const renderPull = () => {
-      animationFrame = 0;
-      const gridBounds = grid.getBoundingClientRect();
-      for (const { wrapper, surface } of tiles) {
-        const centerX = gridBounds.left + wrapper.offsetLeft + wrapper.offsetWidth / 2;
-        const centerY = gridBounds.top + wrapper.offsetTop + wrapper.offsetWidth / 2;
-        const dx = pointerX - centerX;
-        const dy = pointerY - centerY;
-        const distance = Math.hypot(dx, dy);
-        const pull = Math.pow(Math.max(0, 1 - distance / 720), 1.65);
-        const directionX = distance ? dx / distance : 0;
-        const directionY = distance ? dy / distance : 0;
-        const attraction = Math.min(18, distance * 0.09) * pull;
-        const localX = Math.max(-1, Math.min(1, dx / (wrapper.offsetWidth / 2)));
-        const localY = Math.max(-1, Math.min(1, dy / (wrapper.offsetWidth / 2)));
-
-        surface.style.setProperty("--mag-x", `${directionX * attraction}px`);
-        surface.style.setProperty("--mag-y", `${directionY * attraction}px`);
-        surface.style.setProperty("--mag-rx", `${-localY * pull * 1.5}deg`);
-        surface.style.setProperty("--mag-ry", `${localX * pull * 1.5}deg`);
-        surface.style.setProperty("--mag-skew", `${localX * pull * 0.7}deg`);
-        surface.style.setProperty("--mag-scale-x", `${1 + pull * (0.014 + Math.abs(localX) * 0.006)}`);
-        surface.style.setProperty("--mag-scale-y", `${1 + pull * (0.01 + Math.abs(localY) * 0.006)}`);
-      }
-    };
-
-    const trackPull = (event: MouseEvent) => {
-      pointerX = event.clientX;
-      pointerY = event.clientY;
-      if (!animationFrame) animationFrame = window.requestAnimationFrame(renderPull);
-    };
-
-    document.addEventListener("mousemove", trackPull, { passive: true });
-    window.addEventListener("blur", reset);
-    document.documentElement.addEventListener("mouseleave", reset);
-    return () => {
-      document.removeEventListener("mousemove", trackPull);
-      window.removeEventListener("blur", reset);
-      document.documentElement.removeEventListener("mouseleave", reset);
-      if (animationFrame) window.cancelAnimationFrame(animationFrame);
-      reset();
-    };
-  }, [category, showWork, visible.length]);
 
   const close = useCallback(() => {
     setViewerIndex(null);
@@ -359,7 +290,7 @@ export default function Home() {
       </section>
 
       <section id="work" className={`work ${showWork ? "revealed" : ""}`}>
-        <div className="grid" ref={gridRef}>
+        <div className="grid">
           {visible.map((project, index) => <VideoTile key={project.id} project={project} onOpen={() => setViewerIndex(index)} />)}
         </div>
       </section>
