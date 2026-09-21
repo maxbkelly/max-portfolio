@@ -325,6 +325,9 @@ export default function Home() {
           <div className="viewer-top"><span>{current.title}</span><button className="viewer-mobile-close" onClick={(event) => { event.stopPropagation(); close(); }} aria-label="Close video">CLOSE ×</button></div>
           <button className="viewer-arrow previous" onClick={(event) => { event.stopPropagation(); move(-1); }} aria-label="Previous project">←</button>
           <button className="viewer-arrow next" onClick={(event) => { event.stopPropagation(); move(1); }} aria-label="Next project">→</button>
+          {current.credits?.length ? (
+            <div className="viewer-credit">{current.credits.map((credit) => `${credit.label} by ${credit.value}`).join(" · ")}</div>
+          ) : null}
           <div className="viewer-count">{String(viewerIndex! + 1).padStart(2, "0")} / {String(visible.length).padStart(2, "0")}</div>
           <span
             className={`viewer-cursor ${cursor.visible ? "visible" : ""}`}

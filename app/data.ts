@@ -1,3 +1,8 @@
+export type Credit = {
+  label: string;
+  value: string;
+};
+
 export type Project = {
   id: string;
   sourceId: string;
@@ -5,6 +10,7 @@ export type Project = {
   vimeoId: string;
   vimeoHash?: string;
   accent: string;
+  credits?: Credit[];
 };
 
 export type PortfolioSection = {
@@ -93,7 +99,7 @@ const query = `*[_type == "siteSettings" && _id == "siteSettings"][0]{
       enabled,
       "projects": projects[]{
         "placementId": _key,
-        ...@->{_id, title, vimeoUrl, accent}
+        ...@->{_id, title, vimeoUrl, accent, credits}
       }
     }
   }
@@ -117,6 +123,7 @@ type SanityResponse = {
         title?: string;
         vimeoUrl?: string;
         accent?: string;
+        credits?: Credit[];
       }>;
     }>;
   };
@@ -144,6 +151,7 @@ export async function loadCmsContent(signal?: AbortSignal): Promise<PortfolioCon
           sourceId: project._id,
           title: project.title,
           accent: project.accent || "#827c71",
+          ...(project.credits?.length ? {credits: project.credits} : {}),
           ...video,
         }];
       }),
