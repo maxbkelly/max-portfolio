@@ -185,6 +185,11 @@ export default function Home() {
   const [mobileVideoBottom, setMobileVideoBottom] = useState<number | null>(null);
   const [heroMuted, setHeroMuted] = useState(true);
   const [heroReady, setHeroReady] = useState(false);
+  // The instant-loading placeholder caused enough autoplay-policy trouble on
+  // phones (stuck play buttons, hung state) that it's not worth it there —
+  // mobile just shows the Vimeo reel directly, taking its natural load time,
+  // same as before this feature existed. Desktop keeps the placeholder.
+  const [isTouchDevice] = useState(() => typeof window !== "undefined" && window.matchMedia("(pointer: coarse)").matches);
   const [cursor, setCursor] = useState({ x: 0, y: 0, visible: false });
   const heroFrame = useRef<HTMLIFrameElement>(null);
   const heroPlaceholder = useRef<HTMLVideoElement>(null);
@@ -413,7 +418,7 @@ export default function Home() {
       </header>
 
       <section className="hero" aria-label="Featured reel">
-        {!heroReady && (
+        {!heroReady && !isTouchDevice && (
           <video
             ref={heroPlaceholder}
             className="hero-video hero-placeholder"
