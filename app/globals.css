@@ -15,6 +15,13 @@ nav button:hover::after { right: 0; }
 .hero { height: 100svh; min-height: 600px; position: relative; overflow: hidden; background: #151515; }
 .hero-video { position: absolute; top: 50%; left: 50%; width: 177.78vh; height: 100vh; min-width: 100vw; min-height: 56.25vw; border: 0; transform: translate(-50%, -50%); pointer-events: none; filter: saturate(1) contrast(1.02); opacity: 1; object-fit: cover; }
 .hero-placeholder { z-index: 1; }
+@media (pointer: coarse) {
+  /* Some phones block even muted autoplay depending on device settings, so
+     the placeholder needs to be tappable there — desktop autoplay isn't
+     affected by this, and .hero-video's own pointer-events:none (so clicks
+     reach the sound button) stays as-is there. */
+  .hero-placeholder { pointer-events: auto; }
+}
 .hero::after { content: ""; position: absolute; inset: 0; background: linear-gradient(90deg, rgba(0,0,0,.45), transparent 55%), linear-gradient(0deg, rgba(0,0,0,.5), transparent 45%); }
 .hero-sound { position: absolute; z-index: 3; right: 3vw; bottom: 28px; padding: 8px 0; color: #fff; font-size: 10px; font-weight: 400; letter-spacing: .16em; text-shadow: 0 1px 4px rgba(0,0,0,.8); }
 .hero-sound::after { content: ""; position: absolute; left: 0; right: 100%; bottom: 3px; height: 1px; background: currentColor; transition: right .3s; }

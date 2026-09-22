@@ -408,6 +408,7 @@ export default function Home() {
             loop
             playsInline
             aria-hidden="true"
+            onClick={(event) => { event.currentTarget.play().catch(() => {}); }}
           />
         )}
         <iframe
