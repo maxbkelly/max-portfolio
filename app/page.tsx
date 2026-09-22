@@ -337,12 +337,15 @@ export default function Home() {
 
   const current = viewerIndex === null ? null : visible[viewerIndex];
 
-  // The autoPlay attribute doesn't reliably trigger on a React-rendered
-  // <video>, so start it explicitly. iOS Safari also specifically checks
-  // for a real "muted" HTML attribute (not just the DOM property, which is
-  // all React's muted prop reliably sets) before allowing autoplay at all —
-  // set it directly to be sure, since this is exactly the kind of video
-  // Apple's own muted-autoplay allowance is meant to cover.
+  // Deliberately no autoPlay attribute: that's the mechanism behind the
+  // ugly "blocked, tap to retry" button some phones show when native
+  // autoplay is disallowed. Starting playback via script instead means a
+  // blocked attempt just fails silently, leaving the video on its first
+  // frame — a graceful still-image fallback instead of a stuck button.
+  // Also explicitly sets the muted attribute (not just the DOM property,
+  // which is all React's muted prop reliably sets) right before playing,
+  // since muted+playsinline is exactly what Apple's own autoplay
+  // allowance is meant to cover.
   useEffect(() => {
     const el = heroPlaceholder.current;
     if (!el) return;
@@ -415,7 +418,6 @@ export default function Home() {
             ref={heroPlaceholder}
             className="hero-video hero-placeholder"
             src="/hero-placeholder.mp4"
-            autoPlay
             muted
             loop
             playsInline
