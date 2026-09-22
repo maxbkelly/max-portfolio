@@ -18,6 +18,13 @@ export const siteSettingsType = defineType({
       validation: (Rule) => Rule.required().uri({scheme: ["http", "https"]}),
     }),
     defineField({
+      name: "homepageReelMobileUrl",
+      title: "Mobile homepage reel",
+      description: "Optional. A 9:16 (vertical) version shown on phones instead of the reel above. Leave blank to use the same reel on mobile.",
+      type: "url",
+      validation: (Rule) => Rule.uri({scheme: ["http", "https"]}),
+    }),
+    defineField({
       name: "sections",
       title: "Navigation sections",
       description: "Drag to change the menu order. Add or remove sections here to change the website navigation.",

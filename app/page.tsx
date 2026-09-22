@@ -185,6 +185,7 @@ export default function Home() {
   const [mobileVideoBottom, setMobileVideoBottom] = useState<number | null>(null);
   const [heroMuted, setHeroMuted] = useState(true);
   const [heroReady, setHeroReady] = useState(false);
+  const [heroVimeoOverride, setHeroVimeoOverride] = useState<{ vimeoId: string; vimeoHash?: string } | null>(null);
   const [cursor, setCursor] = useState({ x: 0, y: 0, visible: false });
   const heroFrame = useRef<HTMLIFrameElement>(null);
   const heroPlaceholder = useRef<HTMLVideoElement>(null);
@@ -351,6 +352,19 @@ export default function Home() {
     if (window.matchMedia("(pointer: coarse)").matches) setHeroReady(true);
   }, []);
 
+  // Same reasoning as above: an optional 9:16 mobile-specific reel is
+  // applied post-hydration, not baked into the initial render, so it can't
+  // cause a hydration mismatch. Re-checks whenever content changes, since
+  // the mobile reel URL only exists once the real Sanity fetch resolves
+  // (fallbackContent never has one).
+  useLayoutEffect(() => {
+    if (content.homepageReelMobile && window.matchMedia("(pointer: coarse)").matches) {
+      setHeroVimeoOverride(content.homepageReelMobile);
+    }
+  }, [content]);
+
+  const heroVimeo = heroVimeoOverride ?? content.homepageReel;
+
   // Browsers correctly pause backgrounded video when a tab isn't visible —
   // switching apps, checking a setting, even opening Control Center all
   // trigger this. Nothing resumes it automatically once the page is visible
@@ -462,7 +476,7 @@ export default function Home() {
         <iframe
           ref={heroFrame}
           className="hero-video"
-          src={`https://player.vimeo.com/video/${content.homepageReel.vimeoId}?${content.homepageReel.vimeoHash ? `h=${content.homepageReel.vimeoHash}&` : ""}background=1&autoplay=1&loop=1&muted=1&autopause=0&playsinline=1&dnt=1`}
+          src={`https://player.vimeo.com/video/${heroVimeo.vimeoId}?${heroVimeo.vimeoHash ? `h=${heroVimeo.vimeoHash}&` : ""}background=1&autoplay=1&loop=1&muted=1&autopause=0&playsinline=1&dnt=1`}
           title="Maximilian Kelly editors reel"
           allow="autoplay; fullscreen; picture-in-picture"
           onLoad={subscribeHeroEvents}

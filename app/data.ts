@@ -26,6 +26,7 @@ export type PortfolioSection = {
 export type PortfolioContent = {
   siteTitle: string;
   homepageReel: {vimeoId: string; vimeoHash?: string};
+  homepageReelMobile?: {vimeoId: string; vimeoHash?: string};
   sections: PortfolioSection[];
   aboutLead: string;
   aboutBio: string;
@@ -91,6 +92,7 @@ export const fallbackContent: PortfolioContent = {
 const query = `*[_type == "siteSettings" && _id == "siteSettings"][0]{
   siteTitle,
   homepageReelUrl,
+  homepageReelMobileUrl,
   aboutLead,
   aboutBio,
   "sections": sections[]{
@@ -112,6 +114,7 @@ type SanityResponse = {
   result?: {
     siteTitle?: string;
     homepageReelUrl?: string;
+    homepageReelMobileUrl?: string;
     aboutLead?: string;
     aboutBio?: string;
     sections?: Array<{
@@ -167,9 +170,11 @@ export async function loadCmsContent(signal?: AbortSignal): Promise<PortfolioCon
     .filter((section) => section.projects.length > 0);
 
   const homepageReel = parseVimeoUrl(result.homepageReelUrl || "") || fallbackContent.homepageReel;
+  const homepageReelMobile = parseVimeoUrl(result.homepageReelMobileUrl || "") || undefined;
   return {
     siteTitle: result.siteTitle || fallbackContent.siteTitle,
     homepageReel,
+    ...(homepageReelMobile ? {homepageReelMobile} : {}),
     sections: sections.length ? sections : fallbackContent.sections,
     aboutLead: result.aboutLead || fallbackContent.aboutLead,
     aboutBio: result.aboutBio || fallbackContent.aboutBio,
