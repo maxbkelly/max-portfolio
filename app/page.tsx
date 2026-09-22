@@ -383,7 +383,7 @@ export default function Home() {
     // Safety net: however detection fails (slow network, a browser quirk in
     // postMessage timing, autoplay blocked entirely), the placeholder must
     // never loop forever — force the cut over after a few seconds regardless.
-    window.setTimeout(() => setHeroReady(true), 6000);
+    window.setTimeout(() => setHeroReady(true), 3000);
   };
 
   const toggleHeroSound = () => {
