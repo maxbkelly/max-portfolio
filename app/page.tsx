@@ -184,8 +184,10 @@ export default function Home() {
   const [viewerDimensions, setViewerDimensions] = useState({ width: 16, height: 9 });
   const [mobileVideoBottom, setMobileVideoBottom] = useState<number | null>(null);
   const [heroMuted, setHeroMuted] = useState(true);
+  const [heroReady, setHeroReady] = useState(false);
   const [cursor, setCursor] = useState({ x: 0, y: 0, visible: false });
   const heroFrame = useRef<HTMLIFrameElement>(null);
+  const heroPlaceholder = useRef<HTMLVideoElement>(null);
   const viewerFrame = useRef<HTMLIFrameElement>(null);
   const viewerMedia = useRef<HTMLDivElement>(null);
   const activeSection = content.sections.find((section) => section.id === category) || content.sections[0];
@@ -335,6 +337,43 @@ export default function Home() {
 
   const current = viewerIndex === null ? null : visible[viewerIndex];
 
+  // The autoPlay attribute doesn't reliably trigger on a React-rendered
+  // <video>, so start it explicitly.
+  useEffect(() => {
+    heroPlaceholder.current?.play().catch(() => { /* Ignored: worst case it shows a static first frame. */ });
+  }, []);
+
+  // The local placeholder plays instantly (no iframe/network handshake);
+  // once Vimeo confirms actual playback has started, cut away to it.
+  useEffect(() => {
+    const receive = (event: MessageEvent) => {
+      if (event.origin !== "https://player.vimeo.com" || event.source !== heroFrame.current?.contentWindow) return;
+      try {
+        const data = typeof event.data === "string" ? JSON.parse(event.data) : event.data;
+        if (data?.event === "play") setHeroReady(true);
+        // autoplay=1 can start (and fire "play") before addEventListener
+        // below reaches the player, permanently missing that one-time
+        // event — this catches that race by checking current state too.
+        if (data?.method === "getPaused" && data.value === false) setHeroReady(true);
+      } catch { /* Ignore unrelated player messages. */ }
+    };
+    window.addEventListener("message", receive);
+    return () => window.removeEventListener("message", receive);
+  }, []);
+
+  const subscribeHeroEvents = () => {
+    const player = heroFrame.current?.contentWindow;
+    player?.postMessage({ method: "addEventListener", value: "play" }, "https://player.vimeo.com");
+    // A single getPaused check can land in the brief paused window before
+    // autoplay actually kicks in; poll briefly to reliably catch it.
+    let attempts = 0;
+    const poll = window.setInterval(() => {
+      attempts += 1;
+      player?.postMessage({ method: "getPaused" }, "https://player.vimeo.com");
+      if (attempts >= 10) window.clearInterval(poll);
+    }, 200);
+  };
+
   const toggleHeroSound = () => {
     const nextMuted = !heroMuted;
     heroFrame.current?.contentWindow?.postMessage(
@@ -359,12 +398,25 @@ export default function Home() {
       </header>
 
       <section className="hero" aria-label="Featured reel">
+        {!heroReady && (
+          <video
+            ref={heroPlaceholder}
+            className="hero-video hero-placeholder"
+            src="/hero-placeholder.mp4"
+            autoPlay
+            muted
+            loop
+            playsInline
+            aria-hidden="true"
+          />
+        )}
         <iframe
           ref={heroFrame}
           className="hero-video"
           src={`https://player.vimeo.com/video/${content.homepageReel.vimeoId}?${content.homepageReel.vimeoHash ? `h=${content.homepageReel.vimeoHash}&` : ""}background=1&autoplay=1&loop=1&muted=1&autopause=0&dnt=1`}
           title="Maximilian Kelly editors reel"
           allow="autoplay; fullscreen; picture-in-picture"
+          onLoad={subscribeHeroEvents}
         />
         <button className="hero-sound" type="button" onClick={toggleHeroSound}>
           {heroMuted ? "SOUND ON" : "SOUND OFF"}
