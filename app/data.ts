@@ -68,7 +68,7 @@ function makeSection(id: string, title: string, slug: string, sources: ProjectSo
     id,
     title,
     slug,
-    projects: Array.from({length: 9}, (_, index) => {
+    projects: Array.from({length: 12}, (_, index) => {
       const source = sources[index % sources.length];
       const video = parseVimeoUrl(source.vimeoUrl)!;
       return {...source, ...video, id: `${id}-${index + 1}`};
