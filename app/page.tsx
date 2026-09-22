@@ -366,7 +366,6 @@ export default function Home() {
           title="Maximilian Kelly editors reel"
           allow="autoplay; fullscreen; picture-in-picture"
         />
-        <div className="film-grain" />
         <button className="hero-sound" type="button" onClick={toggleHeroSound}>
           {heroMuted ? "SOUND ON" : "SOUND OFF"}
         </button>
