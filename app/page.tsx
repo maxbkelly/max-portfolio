@@ -1,16 +1,65 @@
 "use client";
 
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useLayoutEffect, useRef, useState } from "react";
 import { fallbackContent, loadCmsContent, type Project } from "./data";
+
+let measureProbe: HTMLSpanElement | null = null;
+// Canvas measureText ignores letter-spacing (and can resolve condensed font
+// stacks differently than the DOM), so measure with a real hidden element
+// styled to match instead — the only way to get the true rendered width.
+function measureRenderedWidth(text: string, referenceStyle: CSSStyleDeclaration) {
+  measureProbe ??= document.body.appendChild(document.createElement("span"));
+  Object.assign(measureProbe.style, {
+    position: "absolute",
+    visibility: "hidden",
+    whiteSpace: "nowrap",
+    fontFamily: referenceStyle.fontFamily,
+    fontSize: referenceStyle.fontSize,
+    fontWeight: referenceStyle.fontWeight,
+    fontStretch: referenceStyle.fontStretch,
+    letterSpacing: referenceStyle.letterSpacing,
+  });
+  measureProbe.textContent = text;
+  return measureProbe.getBoundingClientRect().width;
+}
 
 function VideoTile({ project, onOpen }: { project: Project; onOpen: () => void }) {
   const frame = useRef<HTMLIFrameElement>(null);
   const duration = useRef(60);
   const dimensions = useRef<{ width?: number; height?: number }>({});
   const dimensionPoll = useRef<ReturnType<typeof setInterval> | null>(null);
+  const projectNameRef = useRef<HTMLSpanElement>(null);
   const [active, setActive] = useState(false);
   const [tileCursor, setTileCursor] = useState({ x: 0, y: 0 });
   const [videoAspect, setVideoAspect] = useState<number | null>(null);
+  const [projectNameText, setProjectNameText] = useState(project.projectName);
+
+  // Mobile only (matches the max-width:700px breakpoint used everywhere
+  // else). The span shrinks to fit its own content, so comparing its
+  // width against itself is circular — compare against 48% of the
+  // stable parent width instead (the space each side actually gets),
+  // and drop the last word only when the full name would truly overflow.
+  useLayoutEffect(() => {
+    const el = projectNameRef.current;
+    if (!el || !project.projectName) return;
+    const words = project.projectName.trim().split(/\s+/);
+    const shortText = words.length > 1 ? words.slice(0, -1).join(" ") : project.projectName;
+
+    const checkFit = () => {
+      const isMobile = window.matchMedia("(max-width: 700px)").matches;
+      if (!isMobile || !el.parentElement) {
+        setProjectNameText(project.projectName);
+        return;
+      }
+      const available = el.parentElement.clientWidth * 0.48;
+      const fullWidth = measureRenderedWidth(project.projectName!, getComputedStyle(el));
+      setProjectNameText(fullWidth > available ? shortText : project.projectName);
+    };
+
+    checkFit();
+    window.addEventListener("resize", checkFit);
+    return () => window.removeEventListener("resize", checkFit);
+  }, [project.projectName]);
 
   const send = (method: string, value?: number) => {
     frame.current?.contentWindow?.postMessage(
@@ -116,7 +165,7 @@ function VideoTile({ project, onOpen }: { project: Project; onOpen: () => void }
       </span>
       <div className="tile-meta">
         {project.client && project.projectName ? (
-          <h3 className="tile-meta-split"><span>{project.client}</span><span>{project.projectName}</span></h3>
+          <h3 className="tile-meta-split"><span>{project.client}</span><span ref={projectNameRef}>{projectNameText}</span></h3>
         ) : (
           <h3>{project.title}</h3>
         )}
