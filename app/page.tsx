@@ -338,9 +338,17 @@ export default function Home() {
   const current = viewerIndex === null ? null : visible[viewerIndex];
 
   // The autoPlay attribute doesn't reliably trigger on a React-rendered
-  // <video>, so start it explicitly.
+  // <video>, so start it explicitly. iOS Safari also specifically checks
+  // for a real "muted" HTML attribute (not just the DOM property, which is
+  // all React's muted prop reliably sets) before allowing autoplay at all —
+  // set it directly to be sure, since this is exactly the kind of video
+  // Apple's own muted-autoplay allowance is meant to cover.
   useEffect(() => {
-    heroPlaceholder.current?.play().catch(() => { /* Ignored: worst case it shows a static first frame. */ });
+    const el = heroPlaceholder.current;
+    if (!el) return;
+    el.muted = true;
+    el.setAttribute("muted", "");
+    el.play().catch(() => { /* Ignored: worst case it shows a static first frame. */ });
   }, []);
 
   // The local placeholder plays instantly (no iframe/network handshake);
