@@ -183,7 +183,7 @@ export default function Home() {
   const [viewerAtEdge, setViewerAtEdge] = useState(false);
   const [viewerDimensions, setViewerDimensions] = useState({ width: 16, height: 9 });
   const [mobileVideoBottom, setMobileVideoBottom] = useState<number | null>(null);
-  const [heroMuted, setHeroMuted] = useState(false);
+  const [heroMuted, setHeroMuted] = useState(true);
   const [cursor, setCursor] = useState({ x: 0, y: 0, visible: false });
   const heroFrame = useRef<HTMLIFrameElement>(null);
   const viewerFrame = useRef<HTMLIFrameElement>(null);
@@ -362,7 +362,7 @@ export default function Home() {
         <iframe
           ref={heroFrame}
           className="hero-video"
-          src={`https://player.vimeo.com/video/${content.homepageReel.vimeoId}?${content.homepageReel.vimeoHash ? `h=${content.homepageReel.vimeoHash}&` : ""}background=1&autoplay=1&loop=1&muted=0&autopause=0&dnt=1`}
+          src={`https://player.vimeo.com/video/${content.homepageReel.vimeoId}?${content.homepageReel.vimeoHash ? `h=${content.homepageReel.vimeoHash}&` : ""}background=1&autoplay=1&loop=1&muted=1&autopause=0&dnt=1`}
           title="Maximilian Kelly editors reel"
           allow="autoplay; fullscreen; picture-in-picture"
         />
