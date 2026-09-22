@@ -351,6 +351,21 @@ export default function Home() {
     if (window.matchMedia("(pointer: coarse)").matches) setHeroReady(true);
   }, []);
 
+  // Browsers correctly pause backgrounded video when a tab isn't visible —
+  // switching apps, checking a setting, even opening Control Center all
+  // trigger this. Nothing resumes it automatically once the page is visible
+  // again, so without this it stays frozen forever at whatever frame it was
+  // on, which is exactly the "stuck mid-video" bug reported on mobile.
+  useEffect(() => {
+    const resume = () => {
+      if (document.visibilityState !== "visible") return;
+      heroFrame.current?.contentWindow?.postMessage({ method: "play" }, "https://player.vimeo.com");
+      if (heroPlaceholder.current?.paused) heroPlaceholder.current.play().catch(() => {});
+    };
+    document.addEventListener("visibilitychange", resume);
+    return () => document.removeEventListener("visibilitychange", resume);
+  }, []);
+
   // Deliberately no autoPlay attribute: that's the mechanism behind the
   // ugly "blocked, tap to retry" button some phones show when native
   // autoplay is disallowed. Starting playback via script instead means a
