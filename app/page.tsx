@@ -373,13 +373,17 @@ export default function Home() {
     const player = heroFrame.current?.contentWindow;
     player?.postMessage({ method: "addEventListener", value: "play" }, "https://player.vimeo.com");
     // A single getPaused check can land in the brief paused window before
-    // autoplay actually kicks in; poll briefly to reliably catch it.
+    // autoplay actually kicks in; poll for a while to reliably catch it.
     let attempts = 0;
     const poll = window.setInterval(() => {
       attempts += 1;
       player?.postMessage({ method: "getPaused" }, "https://player.vimeo.com");
-      if (attempts >= 10) window.clearInterval(poll);
+      if (attempts >= 25) window.clearInterval(poll);
     }, 200);
+    // Safety net: however detection fails (slow network, a browser quirk in
+    // postMessage timing, autoplay blocked entirely), the placeholder must
+    // never loop forever — force the cut over after a few seconds regardless.
+    window.setTimeout(() => setHeroReady(true), 6000);
   };
 
   const toggleHeroSound = () => {
