@@ -185,11 +185,6 @@ export default function Home() {
   const [mobileVideoBottom, setMobileVideoBottom] = useState<number | null>(null);
   const [heroMuted, setHeroMuted] = useState(true);
   const [heroReady, setHeroReady] = useState(false);
-  // The instant-loading placeholder caused enough autoplay-policy trouble on
-  // phones (stuck play buttons, hung state) that it's not worth it there —
-  // mobile just shows the Vimeo reel directly, taking its natural load time,
-  // same as before this feature existed. Desktop keeps the placeholder.
-  const [isTouchDevice] = useState(() => typeof window !== "undefined" && window.matchMedia("(pointer: coarse)").matches);
   const [cursor, setCursor] = useState({ x: 0, y: 0, visible: false });
   const heroFrame = useRef<HTMLIFrameElement>(null);
   const heroPlaceholder = useRef<HTMLVideoElement>(null);
@@ -342,6 +337,20 @@ export default function Home() {
 
   const current = viewerIndex === null ? null : visible[viewerIndex];
 
+  // The instant-loading placeholder caused enough autoplay-policy trouble on
+  // phones that it's not worth it there — mobile just shows the Vimeo reel
+  // directly. This has to be decided via an effect, not render-time device
+  // detection: checking matchMedia during the initial render disagrees with
+  // the server (which has no window and would assume desktop), and that
+  // mismatch makes React discard and rebuild the whole tree on the client —
+  // destroying and recreating the Vimeo iframe in the process, which loses
+  // the autoplay eligibility that only applies to markup from the original
+  // HTML. useLayoutEffect runs after hydration is already reconciled, so it
+  // can't cause that mismatch, and fires before paint so there's no flash.
+  useLayoutEffect(() => {
+    if (window.matchMedia("(pointer: coarse)").matches) setHeroReady(true);
+  }, []);
+
   // Deliberately no autoPlay attribute: that's the mechanism behind the
   // ugly "blocked, tap to retry" button some phones show when native
   // autoplay is disallowed. Starting playback via script instead means a
@@ -378,6 +387,11 @@ export default function Home() {
   }, []);
 
   const subscribeHeroEvents = () => {
+    // On mobile heroReady is already forced true before this ever fires
+    // (see the layout effect above), so there's nothing left to detect —
+    // skip this burst of postMessage traffic entirely rather than let it
+    // run for no purpose right as Vimeo is trying to autoplay.
+    if (heroReady) return;
     const player = heroFrame.current?.contentWindow;
     player?.postMessage({ method: "addEventListener", value: "play" }, "https://player.vimeo.com");
     // A single getPaused check can land in the brief paused window before
@@ -418,7 +432,7 @@ export default function Home() {
       </header>
 
       <section className="hero" aria-label="Featured reel">
-        {!heroReady && !isTouchDevice && (
+        {!heroReady && (
           <video
             ref={heroPlaceholder}
             className="hero-video hero-placeholder"
@@ -433,7 +447,7 @@ export default function Home() {
         <iframe
           ref={heroFrame}
           className="hero-video"
-          src={`https://player.vimeo.com/video/${content.homepageReel.vimeoId}?${content.homepageReel.vimeoHash ? `h=${content.homepageReel.vimeoHash}&` : ""}background=1&autoplay=1&loop=1&muted=1&autopause=0&dnt=1`}
+          src={`https://player.vimeo.com/video/${content.homepageReel.vimeoId}?${content.homepageReel.vimeoHash ? `h=${content.homepageReel.vimeoHash}&` : ""}background=1&autoplay=1&loop=1&muted=1&autopause=0&playsinline=1&dnt=1`}
           title="Maximilian Kelly editors reel"
           allow="autoplay; fullscreen; picture-in-picture"
           onLoad={subscribeHeroEvents}
