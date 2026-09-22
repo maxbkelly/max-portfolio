@@ -133,6 +133,7 @@ export default function Home() {
   const [viewerPlaying, setViewerPlaying] = useState(false);
   const [viewerAtEdge, setViewerAtEdge] = useState(false);
   const [viewerDimensions, setViewerDimensions] = useState({ width: 16, height: 9 });
+  const [mobileVideoBottom, setMobileVideoBottom] = useState<number | null>(null);
   const [heroMuted, setHeroMuted] = useState(true);
   const [cursor, setCursor] = useState({ x: 0, y: 0, visible: false });
   const heroFrame = useRef<HTMLIFrameElement>(null);
@@ -197,6 +198,32 @@ export default function Home() {
       window.removeEventListener("message", receive);
     };
   }, [viewerIndex, requestViewerDimensions]);
+
+  // On mobile, a horizontal video's bottom edge (past its letterboxed
+  // margin) is where the credit/counter text should sit, instead of the
+  // desktop's fixed distance from the screen's own bottom edge.
+  useEffect(() => {
+    if (viewerIndex === null) return;
+    const updateVideoBottom = () => {
+      const bounds = viewerMedia.current?.getBoundingClientRect();
+      const videoAspect = viewerDimensions.width / viewerDimensions.height;
+      if (!bounds || !Number.isFinite(videoAspect) || videoAspect <= 0) return;
+      const containerAspect = bounds.width / bounds.height;
+      if (videoAspect > containerAspect) {
+        const videoHeight = bounds.width / videoAspect;
+        setMobileVideoBottom(bounds.top + (bounds.height + videoHeight) / 2);
+      } else {
+        setMobileVideoBottom(bounds.bottom);
+      }
+    };
+    updateVideoBottom();
+    window.addEventListener("resize", updateVideoBottom);
+    window.addEventListener("orientationchange", updateVideoBottom);
+    return () => {
+      window.removeEventListener("resize", updateVideoBottom);
+      window.removeEventListener("orientationchange", updateVideoBottom);
+    };
+  }, [viewerIndex, viewerDimensions]);
 
   const toggleViewer = useCallback(() => {
     if (viewerPlaying) {
@@ -310,7 +337,9 @@ export default function Home() {
 
       {current && (
         <div
-          className={`viewer ${viewerAtEdge ? "at-edge" : ""}`}
+          className={`viewer ${viewerAtEdge ? "at-edge" : ""} ${viewerPlaying ? "is-playing" : ""}`}
+          data-orientation={viewerDimensions.width >= viewerDimensions.height ? "horizontal" : "vertical"}
+          style={{ "--mobile-credit-top": mobileVideoBottom !== null ? `${mobileVideoBottom}px` : undefined } as React.CSSProperties}
           role="dialog"
           aria-modal="true"
           aria-label={`${current.title} video player`}
