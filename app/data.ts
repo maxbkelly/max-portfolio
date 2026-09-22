@@ -1,10 +1,19 @@
+export type Credit = {
+  label: string;
+  value: string;
+};
+
 export type Project = {
   id: string;
   sourceId: string;
   title: string;
+  client?: string;
+  projectName?: string;
   vimeoId: string;
   vimeoHash?: string;
   accent: string;
+  credits?: Credit[];
+  thumbnailUrl?: string;
 };
 
 export type PortfolioSection = {
@@ -59,7 +68,7 @@ function makeSection(id: string, title: string, slug: string, sources: ProjectSo
     id,
     title,
     slug,
-    projects: Array.from({length: 9}, (_, index) => {
+    projects: Array.from({length: 12}, (_, index) => {
       const source = sources[index % sources.length];
       const video = parseVimeoUrl(source.vimeoUrl)!;
       return {...source, ...video, id: `${id}-${index + 1}`};
@@ -93,7 +102,7 @@ const query = `*[_type == "siteSettings" && _id == "siteSettings"][0]{
       enabled,
       "projects": projects[]{
         "placementId": _key,
-        ...@->{_id, title, vimeoUrl, accent}
+        ...@->{_id, title, client, projectName, vimeoUrl, accent, credits, "thumbnailUrl": thumbnail.asset->url}
       }
     }
   }
@@ -115,8 +124,12 @@ type SanityResponse = {
         placementId?: string;
         _id?: string;
         title?: string;
+        client?: string;
+        projectName?: string;
         vimeoUrl?: string;
         accent?: string;
+        credits?: Credit[];
+        thumbnailUrl?: string;
       }>;
     }>;
   };
@@ -144,6 +157,9 @@ export async function loadCmsContent(signal?: AbortSignal): Promise<PortfolioCon
           sourceId: project._id,
           title: project.title,
           accent: project.accent || "#827c71",
+          ...(project.client && project.projectName ? {client: project.client, projectName: project.projectName} : {}),
+          ...(project.credits?.length ? {credits: project.credits} : {}),
+          ...(project.thumbnailUrl ? {thumbnailUrl: project.thumbnailUrl} : {}),
           ...video,
         }];
       }),

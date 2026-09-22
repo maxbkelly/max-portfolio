@@ -1,16 +1,65 @@
 "use client";
 
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useLayoutEffect, useRef, useState } from "react";
 import { fallbackContent, loadCmsContent, type Project } from "./data";
+
+let measureProbe: HTMLSpanElement | null = null;
+// Canvas measureText ignores letter-spacing (and can resolve condensed font
+// stacks differently than the DOM), so measure with a real hidden element
+// styled to match instead — the only way to get the true rendered width.
+function measureRenderedWidth(text: string, referenceStyle: CSSStyleDeclaration) {
+  measureProbe ??= document.body.appendChild(document.createElement("span"));
+  Object.assign(measureProbe.style, {
+    position: "absolute",
+    visibility: "hidden",
+    whiteSpace: "nowrap",
+    fontFamily: referenceStyle.fontFamily,
+    fontSize: referenceStyle.fontSize,
+    fontWeight: referenceStyle.fontWeight,
+    fontStretch: referenceStyle.fontStretch,
+    letterSpacing: referenceStyle.letterSpacing,
+  });
+  measureProbe.textContent = text;
+  return measureProbe.getBoundingClientRect().width;
+}
 
 function VideoTile({ project, onOpen }: { project: Project; onOpen: () => void }) {
   const frame = useRef<HTMLIFrameElement>(null);
   const duration = useRef(60);
   const dimensions = useRef<{ width?: number; height?: number }>({});
   const dimensionPoll = useRef<ReturnType<typeof setInterval> | null>(null);
+  const projectNameRef = useRef<HTMLSpanElement>(null);
   const [active, setActive] = useState(false);
   const [tileCursor, setTileCursor] = useState({ x: 0, y: 0 });
   const [videoAspect, setVideoAspect] = useState<number | null>(null);
+  const [projectNameText, setProjectNameText] = useState(project.projectName);
+
+  // Mobile only (matches the max-width:700px breakpoint used everywhere
+  // else). The span shrinks to fit its own content, so comparing its
+  // width against itself is circular — compare against 48% of the
+  // stable parent width instead (the space each side actually gets),
+  // and drop the last word only when the full name would truly overflow.
+  useLayoutEffect(() => {
+    const el = projectNameRef.current;
+    if (!el || !project.projectName) return;
+    const words = project.projectName.trim().split(/\s+/);
+    const shortText = words.length > 1 ? words.slice(0, -1).join(" ") : project.projectName;
+
+    const checkFit = () => {
+      const isMobile = window.matchMedia("(max-width: 700px)").matches;
+      if (!isMobile || !el.parentElement) {
+        setProjectNameText(project.projectName);
+        return;
+      }
+      const available = el.parentElement.clientWidth * 0.48;
+      const fullWidth = measureRenderedWidth(project.projectName!, getComputedStyle(el));
+      setProjectNameText(fullWidth > available ? shortText : project.projectName);
+    };
+
+    checkFit();
+    window.addEventListener("resize", checkFit);
+    return () => window.removeEventListener("resize", checkFit);
+  }, [project.projectName]);
 
   const send = (method: string, value?: number) => {
     frame.current?.contentWindow?.postMessage(
@@ -102,6 +151,9 @@ function VideoTile({ project, onOpen }: { project: Project; onOpen: () => void }
             setTimeout(stopDimensionPoll, 4000);
           }}
         />
+        {project.thumbnailUrl && (
+          <img src={project.thumbnailUrl} alt="" className={`tile-thumbnail ${active ? "hidden" : ""}`} />
+        )}
         <span className="tile-shade" />
       </button>
       <span
@@ -112,7 +164,11 @@ function VideoTile({ project, onOpen }: { project: Project; onOpen: () => void }
         PLAY
       </span>
       <div className="tile-meta">
-        <h3>{project.title}</h3>
+        {project.client && project.projectName ? (
+          <h3 className="tile-meta-split"><span>{project.client}</span><span ref={projectNameRef}>{projectNameText}</span></h3>
+        ) : (
+          <h3>{project.title}</h3>
+        )}
       </div>
     </article>
   );
@@ -126,9 +182,12 @@ export default function Home() {
   const [viewerPlaying, setViewerPlaying] = useState(false);
   const [viewerAtEdge, setViewerAtEdge] = useState(false);
   const [viewerDimensions, setViewerDimensions] = useState({ width: 16, height: 9 });
+  const [mobileVideoBottom, setMobileVideoBottom] = useState<number | null>(null);
   const [heroMuted, setHeroMuted] = useState(true);
+  const [heroReady, setHeroReady] = useState(false);
   const [cursor, setCursor] = useState({ x: 0, y: 0, visible: false });
   const heroFrame = useRef<HTMLIFrameElement>(null);
+  const heroPlaceholder = useRef<HTMLVideoElement>(null);
   const viewerFrame = useRef<HTMLIFrameElement>(null);
   const viewerMedia = useRef<HTMLDivElement>(null);
   const activeSection = content.sections.find((section) => section.id === category) || content.sections[0];
@@ -191,6 +250,32 @@ export default function Home() {
     };
   }, [viewerIndex, requestViewerDimensions]);
 
+  // On mobile, a horizontal video's bottom edge (past its letterboxed
+  // margin) is where the credit/counter text should sit, instead of the
+  // desktop's fixed distance from the screen's own bottom edge.
+  useEffect(() => {
+    if (viewerIndex === null) return;
+    const updateVideoBottom = () => {
+      const bounds = viewerMedia.current?.getBoundingClientRect();
+      const videoAspect = viewerDimensions.width / viewerDimensions.height;
+      if (!bounds || !Number.isFinite(videoAspect) || videoAspect <= 0) return;
+      const containerAspect = bounds.width / bounds.height;
+      if (videoAspect > containerAspect) {
+        const videoHeight = bounds.width / videoAspect;
+        setMobileVideoBottom(bounds.top + (bounds.height + videoHeight) / 2);
+      } else {
+        setMobileVideoBottom(bounds.bottom);
+      }
+    };
+    updateVideoBottom();
+    window.addEventListener("resize", updateVideoBottom);
+    window.addEventListener("orientationchange", updateVideoBottom);
+    return () => {
+      window.removeEventListener("resize", updateVideoBottom);
+      window.removeEventListener("orientationchange", updateVideoBottom);
+    };
+  }, [viewerIndex, viewerDimensions]);
+
   const toggleViewer = useCallback(() => {
     if (viewerPlaying) {
       sendToViewer("pause");
@@ -252,6 +337,43 @@ export default function Home() {
 
   const current = viewerIndex === null ? null : visible[viewerIndex];
 
+  // The autoPlay attribute doesn't reliably trigger on a React-rendered
+  // <video>, so start it explicitly.
+  useEffect(() => {
+    heroPlaceholder.current?.play().catch(() => { /* Ignored: worst case it shows a static first frame. */ });
+  }, []);
+
+  // The local placeholder plays instantly (no iframe/network handshake);
+  // once Vimeo confirms actual playback has started, cut away to it.
+  useEffect(() => {
+    const receive = (event: MessageEvent) => {
+      if (event.origin !== "https://player.vimeo.com" || event.source !== heroFrame.current?.contentWindow) return;
+      try {
+        const data = typeof event.data === "string" ? JSON.parse(event.data) : event.data;
+        if (data?.event === "play") setHeroReady(true);
+        // autoplay=1 can start (and fire "play") before addEventListener
+        // below reaches the player, permanently missing that one-time
+        // event — this catches that race by checking current state too.
+        if (data?.method === "getPaused" && data.value === false) setHeroReady(true);
+      } catch { /* Ignore unrelated player messages. */ }
+    };
+    window.addEventListener("message", receive);
+    return () => window.removeEventListener("message", receive);
+  }, []);
+
+  const subscribeHeroEvents = () => {
+    const player = heroFrame.current?.contentWindow;
+    player?.postMessage({ method: "addEventListener", value: "play" }, "https://player.vimeo.com");
+    // A single getPaused check can land in the brief paused window before
+    // autoplay actually kicks in; poll briefly to reliably catch it.
+    let attempts = 0;
+    const poll = window.setInterval(() => {
+      attempts += 1;
+      player?.postMessage({ method: "getPaused" }, "https://player.vimeo.com");
+      if (attempts >= 10) window.clearInterval(poll);
+    }, 200);
+  };
+
   const toggleHeroSound = () => {
     const nextMuted = !heroMuted;
     heroFrame.current?.contentWindow?.postMessage(
@@ -276,14 +398,26 @@ export default function Home() {
       </header>
 
       <section className="hero" aria-label="Featured reel">
+        {!heroReady && (
+          <video
+            ref={heroPlaceholder}
+            className="hero-video hero-placeholder"
+            src="/hero-placeholder.mp4"
+            autoPlay
+            muted
+            loop
+            playsInline
+            aria-hidden="true"
+          />
+        )}
         <iframe
           ref={heroFrame}
           className="hero-video"
           src={`https://player.vimeo.com/video/${content.homepageReel.vimeoId}?${content.homepageReel.vimeoHash ? `h=${content.homepageReel.vimeoHash}&` : ""}background=1&autoplay=1&loop=1&muted=1&autopause=0&dnt=1`}
           title="Maximilian Kelly editors reel"
           allow="autoplay; fullscreen; picture-in-picture"
+          onLoad={subscribeHeroEvents}
         />
-        <div className="film-grain" />
         <button className="hero-sound" type="button" onClick={toggleHeroSound}>
           {heroMuted ? "SOUND ON" : "SOUND OFF"}
         </button>
@@ -303,7 +437,9 @@ export default function Home() {
 
       {current && (
         <div
-          className={`viewer ${viewerAtEdge ? "at-edge" : ""}`}
+          className={`viewer ${viewerAtEdge ? "at-edge" : ""} ${viewerPlaying ? "is-playing" : ""}`}
+          data-orientation={viewerDimensions.width >= viewerDimensions.height ? "horizontal" : "vertical"}
+          style={{ "--mobile-credit-top": mobileVideoBottom !== null ? `${mobileVideoBottom}px` : undefined } as React.CSSProperties}
           role="dialog"
           aria-modal="true"
           aria-label={`${current.title} video player`}
@@ -325,7 +461,10 @@ export default function Home() {
           <div className="viewer-top"><span>{current.title}</span><button className="viewer-mobile-close" onClick={(event) => { event.stopPropagation(); close(); }} aria-label="Close video">CLOSE ×</button></div>
           <button className="viewer-arrow previous" onClick={(event) => { event.stopPropagation(); move(-1); }} aria-label="Previous project">←</button>
           <button className="viewer-arrow next" onClick={(event) => { event.stopPropagation(); move(1); }} aria-label="Next project">→</button>
-          <div className="viewer-count">{String(viewerIndex! + 1).padStart(2, "0")} / {String(visible.length).padStart(2, "0")}</div>
+          {current.credits?.length ? (
+            <div className={`viewer-credit ${viewerAtEdge ? "" : "faded"}`}>{current.credits.map((credit) => `${credit.label} by ${credit.value}`).join(" · ")}</div>
+          ) : null}
+          <div className={`viewer-count ${viewerAtEdge ? "" : "faded"}`}>{String(viewerIndex! + 1).padStart(2, "0")} / {String(visible.length).padStart(2, "0")}</div>
           <span
             className={`viewer-cursor ${cursor.visible ? "visible" : ""}`}
             style={{ transform: `translate3d(${cursor.x}px, ${cursor.y}px, 0) translateY(-50%)` }}

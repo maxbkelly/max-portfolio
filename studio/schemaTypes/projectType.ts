@@ -7,9 +7,22 @@ export const projectType = defineType({
   fields: [
     defineField({
       name: "title",
-      title: "Project name",
+      title: "Fallback title",
+      description: "Used everywhere (browser tab, video alt text) until Client and Project name below are both filled in — then those replace it under the thumbnail.",
       type: "string",
       validation: (Rule) => Rule.required(),
+    }),
+    defineField({
+      name: "client",
+      title: "Client",
+      description: "Shown on the left under the thumbnail. Leave this and Project name blank to keep showing the Fallback title instead.",
+      type: "string",
+    }),
+    defineField({
+      name: "projectName",
+      title: "Project name",
+      description: "Shown on the right under the thumbnail.",
+      type: "string",
     }),
     defineField({
       name: "vimeoUrl",
@@ -17,6 +30,13 @@ export const projectType = defineType({
       description: "Paste the regular or unlisted Vimeo link. Manager links work too.",
       type: "url",
       validation: (Rule) => Rule.required().uri({scheme: ["http", "https"]}),
+    }),
+    defineField({
+      name: "thumbnail",
+      title: "Custom thumbnail",
+      description: "Optional. Shown in the grid instead of the video's own frame; hovering still plays the video preview as usual. Leave blank to keep showing the video frame.",
+      type: "image",
+      options: {hotspot: true},
     }),
     defineField({
       name: "description",
@@ -51,6 +71,6 @@ export const projectType = defineType({
     }),
   ],
   preview: {
-    select: {title: "title", subtitle: "vimeoUrl"},
+    select: {title: "title", subtitle: "vimeoUrl", media: "thumbnail"},
   },
 });

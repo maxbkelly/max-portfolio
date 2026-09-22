@@ -13,24 +13,26 @@ nav button { font-size: 11px; letter-spacing: .14em; position: relative; padding
 nav button::after { content: ""; position: absolute; left: 0; right: 100%; bottom: 2px; height: 1px; background: currentColor; transition: right .3s; }
 nav button:hover::after { right: 0; }
 .hero { height: 100svh; min-height: 600px; position: relative; overflow: hidden; background: #151515; }
-.hero-video { position: absolute; top: 50%; left: 50%; width: 177.78vh; height: 100vh; min-width: 100vw; min-height: 56.25vw; border: 0; transform: translate(-50%, -50%); pointer-events: none; filter: saturate(1) contrast(1.02); opacity: 1; }
+.hero-video { position: absolute; top: 50%; left: 50%; width: 177.78vh; height: 100vh; min-width: 100vw; min-height: 56.25vw; border: 0; transform: translate(-50%, -50%); pointer-events: none; filter: saturate(1) contrast(1.02); opacity: 1; object-fit: cover; }
+.hero-placeholder { z-index: 1; }
 .hero::after { content: ""; position: absolute; inset: 0; background: linear-gradient(90deg, rgba(0,0,0,.45), transparent 55%), linear-gradient(0deg, rgba(0,0,0,.5), transparent 45%); }
-.film-grain { position: absolute; inset: -50%; z-index: 2; opacity: .045; pointer-events: none; background-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 180 180' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='.9' numOctaves='3' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)' opacity='.8'/%3E%3C/svg%3E"); animation: grain .25s steps(2) infinite; }
 .hero-sound { position: absolute; z-index: 3; right: 3vw; bottom: 28px; padding: 8px 0; color: #fff; font-size: 10px; font-weight: 400; letter-spacing: .16em; text-shadow: 0 1px 4px rgba(0,0,0,.8); }
 .hero-sound::after { content: ""; position: absolute; left: 0; right: 100%; bottom: 3px; height: 1px; background: currentColor; transition: right .3s; }
 .hero-sound:hover::after { right: 0; }
-@keyframes grain { 0% { transform: translate(0,0) } 25% { transform: translate(3%,-2%) } 50% { transform: translate(-2%,3%) } 75% { transform: translate(2%,2%) } }
 .eyebrow { font-size: 10px; letter-spacing: .22em; margin: 0 0 20px; }
 .work { min-height: 100vh; padding: 120px 3vw 170px; }
 .grid { display: grid; grid-template-columns: repeat(3, 26%); justify-content: space-between; column-gap: 0; row-gap: 7.2vw; }
 .tile-hit { display: block; width: 100%; aspect-ratio: 1; position: relative; overflow: hidden; background: var(--accent); padding: 0; }
-.tile-hit iframe { position: absolute; top: 50%; left: 50%; width: 177.78%; height: 100%; border: 0; transform: translate(-50%, -50%) scale(1.02); pointer-events: none; filter: saturate(.65) contrast(1.05); transition: transform .8s cubic-bezier(.2,.7,.2,1), filter .4s; }
-.project-tile:hover iframe { transform: translate(-50%, -50%) scale(1.07); filter: saturate(1); }
+.tile-hit iframe { position: absolute; top: 50%; left: 50%; width: 177.78%; height: 100%; border: 0; transform: translate(-50%, -50%) scale(1.02); pointer-events: none; transition: transform .8s cubic-bezier(.2,.7,.2,1); }
+.project-tile:hover iframe { transform: translate(-50%, -50%) scale(1.07); }
+.tile-thumbnail { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: cover; pointer-events: none; transition: opacity .4s; }
+.tile-thumbnail.hidden { opacity: 0; }
 .tile-shade { position: absolute; inset: 0; background: linear-gradient(0deg, rgba(0,0,0,.4), transparent 50%); }
 .tile-cursor { position: fixed; z-index: 30; top: 0; left: 0; margin-left: 27px; color: #fff; font-size: 16px; font-stretch: condensed; font-weight: 400; letter-spacing: .12em; line-height: 1; opacity: 0; pointer-events: none; text-shadow: 0 1px 4px rgba(0,0,0,.8); transition: opacity .12s; white-space: nowrap; }
 .tile-cursor.visible { opacity: 1; }
 .tile-meta { padding-top: 15px; border-top: 1px solid #3a3936; margin-top: 12px; }
-.tile-meta h3 { margin: 0; font-size: clamp(18px, 1.8vw, 30px); letter-spacing: -.035em; font-weight: 500; }
+.tile-meta h3 { margin: 0; font-size: clamp(9px, 0.9vw, 15px); letter-spacing: -.035em; font-weight: 500; }
+.tile-meta h3.tile-meta-split { display: flex; justify-content: space-between; gap: 12px; }
 .about { padding: 120px 3vw 160px; background: var(--ink); color: var(--paper); }
 .about-inspiration { max-width: 1250px; margin: 70px 0 0; font-family: Georgia, serif; font-size: clamp(34px, 4.8vw, 76px); font-style: italic; line-height: 1.08; letter-spacing: -.035em; }
 .about-bio { max-width: 520px; margin: 100px 8vw 0 auto; font-family: Georgia, serif; font-size: clamp(18px, 1.65vw, 25px); font-style: italic; line-height: 1.5; letter-spacing: -.01em; }
@@ -45,13 +47,46 @@ nav button:hover::after { right: 0; }
 .viewer-mobile-close { display: none; pointer-events: auto; }
 .viewer-arrow { position: absolute; top: 50%; z-index: 2; font-size: 34px; width: 70px; height: 70px; cursor: pointer; }
 .viewer-arrow.previous { left: 10vw; }.viewer-arrow.next { right: 10vw; }
-.viewer-count { position: absolute; bottom: 25px; left: 50%; transform: translateX(-50%); font-size: 9px; letter-spacing: .18em; pointer-events: none; }
+.viewer-count { position: absolute; bottom: 25px; left: 50%; transform: translateX(-50%); font-size: 9px; letter-spacing: .18em; pointer-events: none; transition: opacity .4s; }
+.viewer-count.faded { opacity: 0; }
+.viewer-credit { position: absolute; bottom: 44px; left: 50%; transform: translateX(-50%); font-size: 10px; letter-spacing: .08em; text-transform: uppercase; opacity: .75; pointer-events: none; white-space: nowrap; transition: opacity .4s; }
+.viewer-credit.faded { opacity: 0; }
+
+/* Mobile (touch) only — desktop keeps the hover-near-edge behavior above.
+   Vertical video: text overlays the video, visible until playback starts.
+   Horizontal video: text sits just below the video in its letterboxed
+   margin, visible the whole time it's upright, hidden once rotated to
+   landscape where the video goes widescreen and that margin disappears. */
+@media (pointer: coarse) {
+  .viewer[data-orientation="vertical"] .viewer-count,
+  .viewer[data-orientation="vertical"] .viewer-credit { opacity: 1; }
+  .viewer[data-orientation="vertical"].is-playing .viewer-count,
+  .viewer[data-orientation="vertical"].is-playing .viewer-credit { opacity: 0; }
+
+  .viewer[data-orientation="horizontal"] .viewer-count,
+  .viewer[data-orientation="horizontal"] .viewer-credit { opacity: 1; }
+  .viewer[data-orientation="horizontal"] .viewer-credit {
+    top: calc(var(--mobile-credit-top, 0px) + 14px);
+    bottom: auto;
+  }
+  .viewer[data-orientation="horizontal"] .viewer-count {
+    top: calc(var(--mobile-credit-top, 0px) + 32px);
+    bottom: auto;
+  }
+}
+
+@media (pointer: coarse) and (orientation: landscape) {
+  .viewer[data-orientation="horizontal"] .viewer-count,
+  .viewer[data-orientation="horizontal"] .viewer-credit { opacity: 0; }
+}
+
 .viewer-cursor { position: fixed; z-index: 5; top: 0; left: 0; margin-left: 27px; color: #fff; font-size: 18px; font-stretch: condensed; font-weight: 400; letter-spacing: .12em; line-height: 1; opacity: 0; pointer-events: none; text-shadow: 0 1px 4px rgba(0,0,0,.8); transition: opacity .12s; white-space: nowrap; }
 .viewer-cursor.visible { opacity: 1; }
 @media (max-width: 700px) {
   .topbar { height: 60px; }.wordmark { font-size: 11px; } nav { gap: 12px; } nav button { font-size: 8px; }
-  .grid { grid-template-columns: 1fr; gap: 55px; }
-  .tile-meta h3 { font-size: 30px; }
+  .grid { grid-template-columns: repeat(2, 1fr); gap: 24px; }
+  .tile-meta h3 { font-size: 9px; }
+  .tile-meta-split span { white-space: nowrap; overflow: hidden; max-width: 48%; }
   .about-bio { margin: 65px 0 0 auto; max-width: 90%; }
   .tile-cursor { display: none; }.viewer { cursor: default; }.viewer-top { font-size: 14px; }.viewer-mobile-close { display: block; font-size: 9px; letter-spacing: .12em; }.viewer-cursor { display: none; }
 }
