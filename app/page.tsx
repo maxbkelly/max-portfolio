@@ -467,6 +467,7 @@ export default function Home() {
           />
         )}
         <iframe
+          key={heroVimeo.vimeoId}
           ref={heroFrame}
           className="hero-video"
           src={`https://player.vimeo.com/video/${heroVimeo.vimeoId}?${heroVimeo.vimeoHash ? `h=${heroVimeo.vimeoHash}&` : ""}background=1&autoplay=1&loop=1&muted=1&autopause=0&playsinline=1&dnt=1`}
