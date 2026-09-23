@@ -25,8 +25,6 @@ function measureRenderedWidth(text: string, referenceStyle: CSSStyleDeclaration)
 
 function VideoTile({ project, onOpen }: { project: Project; onOpen: () => void }) {
   const frame = useRef<HTMLIFrameElement>(null);
-  const duration = useRef(60);
-  const durationKnown = useRef(false);
   const dimensions = useRef<{ width?: number; height?: number }>({});
   const dimensionPoll = useRef<ReturnType<typeof setInterval> | null>(null);
   const projectNameRef = useRef<HTMLSpanElement>(null);
@@ -77,23 +75,17 @@ function VideoTile({ project, onOpen }: { project: Project; onOpen: () => void }
   };
 
   // The Vimeo player iframe fires its own "load" before the player app
-  // inside has finished initializing, so a dimensions/duration request sent
-  // right then can arrive before anything is listening and gets dropped
-  // silently. Retry for a few seconds instead of asking once. A dropped
-  // getDuration in particular used to be invisible: duration.current just
-  // kept its 60s fallback forever, so scrubbing across a shorter video hit
-  // its real end partway across the thumbnail and stuck there.
+  // inside has finished initializing, so a dimensions request sent right
+  // then can arrive before anything is listening and gets dropped silently.
+  // Retry for a few seconds instead of asking once.
   const requestDimensions = () => {
     const hasDimensions = dimensions.current.width && dimensions.current.height;
-    if (hasDimensions && durationKnown.current) {
+    if (hasDimensions) {
       stopDimensionPoll();
       return;
     }
-    if (!durationKnown.current) send("getDuration");
-    if (!hasDimensions) {
-      send("getVideoWidth");
-      send("getVideoHeight");
-    }
+    send("getVideoWidth");
+    send("getVideoHeight");
   };
 
   useEffect(() => {
@@ -101,16 +93,10 @@ function VideoTile({ project, onOpen }: { project: Project; onOpen: () => void }
       if (event.origin !== "https://player.vimeo.com" || event.source !== frame.current?.contentWindow) return;
       try {
         const data = typeof event.data === "string" ? JSON.parse(event.data) : event.data;
-        if (data?.method === "getDuration" && Number.isFinite(data.value)) {
-          duration.current = data.value;
-          durationKnown.current = true;
-        }
         if (data?.method === "getVideoWidth" && Number.isFinite(data.value)) dimensions.current.width = data.value;
         if (data?.method === "getVideoHeight" && Number.isFinite(data.value)) dimensions.current.height = data.value;
         if (dimensions.current.width && dimensions.current.height) {
           setVideoAspect(dimensions.current.width / dimensions.current.height);
-        }
-        if (dimensions.current.width && dimensions.current.height && durationKnown.current) {
           stopDimensionPoll();
         }
       } catch { /* Ignore unrelated player messages. */ }
@@ -132,9 +118,7 @@ function VideoTile({ project, onOpen }: { project: Project; onOpen: () => void }
       : { width: "100%", height: `${(1 / videoAspect) * 100}%` }
     : undefined;
 
-  const scrub = (event: React.MouseEvent<HTMLElement>) => {
-    const bounds = event.currentTarget.getBoundingClientRect();
-    send("setCurrentTime", ((event.clientX - bounds.left) / bounds.width) * duration.current);
+  const trackCursor = (event: React.MouseEvent<HTMLElement>) => {
     setTileCursor({ x: event.clientX, y: event.clientY });
   };
 
@@ -142,12 +126,9 @@ function VideoTile({ project, onOpen }: { project: Project; onOpen: () => void }
     <article
       className="project-tile"
       style={{ "--accent": project.accent } as React.CSSProperties}
-      onMouseEnter={() => {
-        setActive(true);
-        send("play");
-      }}
-      onMouseLeave={() => { setActive(false); send("pause"); }}
-      onMouseMove={scrub}
+      onMouseEnter={() => setActive(true)}
+      onMouseLeave={() => setActive(false)}
+      onMouseMove={trackCursor}
     >
       <button className="tile-hit" onClick={onOpen} aria-label={`Play ${project.title}`}>
         <iframe
@@ -164,7 +145,7 @@ function VideoTile({ project, onOpen }: { project: Project; onOpen: () => void }
           }}
         />
         {project.thumbnailUrl && (
-          <img src={project.thumbnailUrl} alt="" className={`tile-thumbnail ${active ? "hidden" : ""}`} />
+          <img src={project.thumbnailUrl} alt="" className="tile-thumbnail" />
         )}
         <span className="tile-shade" />
       </button>
