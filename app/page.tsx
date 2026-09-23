@@ -475,7 +475,7 @@ export default function Home() {
           onLoad={subscribeHeroEvents}
         />
         <button className="hero-sound" type="button" onClick={toggleHeroSound}>
-          {heroMuted ? "SOUND ON" : "SOUND OFF"}
+          {heroMuted ? "SOUND OFF" : "SOUND ON"}
         </button>
       </section>
 
