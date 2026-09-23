@@ -179,6 +179,7 @@ export default function Home() {
   const [mobileVideoBottom, setMobileVideoBottom] = useState<number | null>(null);
   const [heroMuted, setHeroMuted] = useState(true);
   const [heroReady, setHeroReady] = useState(false);
+  const [heroCursor, setHeroCursor] = useState({ x: 0, y: 0 });
   const [cursor, setCursor] = useState({ x: 0, y: 0, visible: false });
   const heroFrame = useRef<HTMLIFrameElement>(null);
   const heroPlaceholder = useRef<HTMLVideoElement>(null);
@@ -441,7 +442,12 @@ export default function Home() {
         </nav>
       </header>
 
-      <section className="hero" aria-label="Featured reel" onClick={toggleHeroSound}>
+      <section
+        className="hero"
+        aria-label="Featured reel"
+        onClick={toggleHeroSound}
+        onMouseMove={(event) => setHeroCursor({ x: event.clientX, y: event.clientY })}
+      >
         {!heroReady && (
           <video
             ref={heroPlaceholder}
@@ -462,7 +468,15 @@ export default function Home() {
           allow="autoplay; fullscreen; picture-in-picture"
           onLoad={subscribeHeroEvents}
         />
-        <button className="hero-sound" type="button" onClick={toggleHeroSound}>
+        <button
+          className="hero-sound hero-sound-desktop"
+          type="button"
+          onClick={toggleHeroSound}
+          style={{ "--hero-cursor-x": `${heroCursor.x}px`, "--hero-cursor-y": `${heroCursor.y}px` } as React.CSSProperties}
+        >
+          {heroMuted ? "SOUND ON" : "SOUND OFF"}
+        </button>
+        <button className="hero-sound hero-sound-mobile" type="button" onClick={toggleHeroSound}>
           {heroMuted ? "SOUND OFF" : "SOUND ON"}
         </button>
       </section>
