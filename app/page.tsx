@@ -508,8 +508,18 @@ export default function Home() {
 
       <section id="about" className="about">
         <p className="eyebrow">ABOUT</p>
-        <p className="about-inspiration">{content.aboutLead}</p>
-        <p className="about-bio">{content.aboutBio}</p>
+        <div className="about-layout">
+          {content.aboutHeadshotUrl ? (
+            <img src={content.aboutHeadshotUrl} alt="" className="about-headshot" />
+          ) : (
+            <div className="about-headshot" aria-hidden="true" />
+          )}
+          <div className="about-copy">
+            {content.aboutParagraphs.map((paragraph, index) => (
+              <p key={index} className="about-paragraph">{paragraph}</p>
+            ))}
+          </div>
+        </div>
       </section>
 
       {current && (
