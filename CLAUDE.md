@@ -6,7 +6,7 @@ This repository is Maximilian Kelly's production portfolio. Preserve its cinemat
 
 - **Code and visual behavior:** GitHub changes made with Claude, reviewed, then deployed.
 - **Content:** Sanity Studio. Do not hardcode ordinary portfolio edits into React.
-- **Video files:** Vimeo. The CMS stores Vimeo URLs; this repository does not store source videos.
+- **Video files:** Vimeo. The CMS stores Vimeo URLs; this repository does not store source videos. Exception: each Project may optionally have a short (under 5s), low-resolution, silent "hover preview clip" uploaded directly as a Sanity file asset (same pattern as thumbnail images) — these are small enough that Sanity's own asset CDN is the right home, not Vimeo or this repo.
 - **Production hosting:** Cloudflare Workers, deployed automatically from GitHub `main`.
 
 ## Architecture
@@ -24,7 +24,7 @@ This repository is Maximilian Kelly's production portfolio. Preserve its cinemat
 - New CMS sections must appear without a code change.
 - A single Project may appear in multiple Sections and have a different position in each.
 - Vimeo manager links, normal links and unlisted links with hashes must continue to work.
-- Grid hover keeps muted preview playback and horizontal scrubbing.
+- Grid hover shows a subtle zoom on the thumbnail, or plays the project's optional hover preview clip if one is set (muted, looping, no scrubbing).
 - The fullscreen viewer keeps custom PLAY/PAUSE/CLOSE cursor behavior, keyboard arrows, Escape-to-close and portrait-video close zones.
 - Keep a graceful fallback if the Sanity request fails.
 - Maintain responsive behavior and reduced-motion support.
