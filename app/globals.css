@@ -46,8 +46,11 @@ nav button:hover::after { right: 0; }
 .tile-meta h3 { margin: 0; font-size: clamp(9px, 0.9vw, 15px); letter-spacing: -.035em; font-weight: 500; }
 .tile-meta h3.tile-meta-split { display: flex; justify-content: space-between; gap: 12px; }
 .about { padding: 120px 3vw 160px; background: var(--ink); color: var(--paper); }
-.about-inspiration { max-width: 1250px; margin: 70px 0 0; font-family: Georgia, serif; font-size: clamp(34px, 4.8vw, 76px); font-style: italic; line-height: 1.08; letter-spacing: -.035em; }
-.about-bio { max-width: 520px; margin: 100px 8vw 0 auto; font-family: Georgia, serif; font-size: clamp(18px, 1.65vw, 25px); font-style: italic; line-height: 1.5; letter-spacing: -.01em; }
+.about-layout { display: flex; gap: 5vw; align-items: flex-start; margin-top: 60px; }
+.about-headshot { width: clamp(240px, 32vw, 460px); aspect-ratio: 1; object-fit: cover; background: var(--muted); flex-shrink: 0; }
+.about-copy { flex: 1; max-width: 980px; }
+.about-paragraph { font-family: Georgia, serif; font-style: italic; font-size: clamp(18px, 1.65vw, 25px); font-weight: 300; line-height: 1.5; letter-spacing: -.01em; margin: 0 0 26px; }
+.about-paragraph:last-child { margin-bottom: 0; }
 .viewer { position: fixed; z-index: 100; inset: 0; overflow: hidden; background: #050505; cursor: pointer; animation: reveal .55s cubic-bezier(.22,.8,.2,1); }
 .viewer.at-edge { cursor: default; }
 @keyframes reveal { from { clip-path: inset(42% 42% 42% 42%); opacity: 0 } to { clip-path: inset(0); opacity: 1 } }
@@ -99,7 +102,8 @@ nav button:hover::after { right: 0; }
   .grid { grid-template-columns: repeat(2, 1fr); gap: 24px; }
   .tile-meta h3 { font-size: 9px; }
   .tile-meta-split span { white-space: nowrap; overflow: hidden; max-width: 48%; }
-  .about-bio { margin: 65px 0 0 auto; max-width: 90%; }
+  .about-layout { flex-direction: column; gap: 32px; margin-top: 40px; }
+  .about-headshot { width: min(60vw, 220px); }
   .tile-cursor { display: none; }.viewer { cursor: default; }.viewer-top { font-size: 14px; }.viewer-mobile-close { display: block; font-size: 9px; letter-spacing: .12em; }.viewer-cursor { display: none; }
   .hero-sound-desktop { display: none; }
   .hero-sound-mobile { display: block; position: absolute; right: 3vw; bottom: 28px; }

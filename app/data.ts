@@ -29,8 +29,8 @@ export type PortfolioContent = {
   homepageReel: {vimeoId: string; vimeoHash?: string};
   homepageReelMobile?: {vimeoId: string; vimeoHash?: string};
   sections: PortfolioSection[];
-  aboutLead: string;
-  aboutBio: string;
+  aboutParagraphs: string[];
+  aboutHeadshotUrl?: string;
 };
 
 type ProjectSource = {
@@ -86,16 +86,20 @@ export const fallbackContent: PortfolioContent = {
     makeSection("section-editor", "EDITOR", "editor", standardProjects),
     makeSection("section-ai", "A.I.", "ai", aiProjects),
   ],
-  aboutLead: "My inspirations include ’90s skate videos, Lil Wayne’s “6 Foot 7 Foot” music video, and the films of Charlie Kaufman.",
-  aboutBio: "Originally from San Francisco, I lived in Amsterdam and then Minneapolis before moving to Chicago to obtain my degree in Post Production Cinema from Columbia College. Now living in LA, I’m focused on creating rhythm, pacing and mood through my projects.",
+  aboutParagraphs: [
+    "Originally from San Francisco, I lived in Amsterdam and then Minneapolis before moving to Chicago to obtain my degree in Post Production Cinema from Columbia College. Now living in LA, I’m focused on creating rhythm, pacing and mood through my projects.",
+    "My inspirations include ’90s skate videos, Lil Wayne’s “6 Foot 7 Foot” music video, and the films of Charlie Kaufman.",
+  ],
 };
 
 const query = `*[_type == "siteSettings" && _id == "siteSettings"][0]{
   siteTitle,
   homepageReelUrl,
   homepageReelMobileUrl,
-  aboutLead,
-  aboutBio,
+  aboutParagraph1,
+  aboutParagraph2,
+  aboutParagraph3,
+  "aboutHeadshotUrl": aboutHeadshot.asset->url + "?w=800&q=80&auto=format",
   "sections": sections[]{
     "placementId": _key,
     ...@->{
@@ -116,8 +120,10 @@ type SanityResponse = {
     siteTitle?: string;
     homepageReelUrl?: string;
     homepageReelMobileUrl?: string;
-    aboutLead?: string;
-    aboutBio?: string;
+    aboutParagraph1?: string;
+    aboutParagraph2?: string;
+    aboutParagraph3?: string;
+    aboutHeadshotUrl?: string;
     sections?: Array<{
       placementId?: string;
       _id?: string;
@@ -174,12 +180,15 @@ export async function loadCmsContent(signal?: AbortSignal): Promise<PortfolioCon
 
   const homepageReel = parseVimeoUrl(result.homepageReelUrl || "") || fallbackContent.homepageReel;
   const homepageReelMobile = parseVimeoUrl(result.homepageReelMobileUrl || "") || undefined;
+  const aboutParagraphs = [result.aboutParagraph1, result.aboutParagraph2, result.aboutParagraph3].filter(
+    (paragraph): paragraph is string => Boolean(paragraph),
+  );
   return {
     siteTitle: result.siteTitle || fallbackContent.siteTitle,
     homepageReel,
     ...(homepageReelMobile ? {homepageReelMobile} : {}),
     sections: sections.length ? sections : fallbackContent.sections,
-    aboutLead: result.aboutLead || fallbackContent.aboutLead,
-    aboutBio: result.aboutBio || fallbackContent.aboutBio,
+    aboutParagraphs: aboutParagraphs.length ? aboutParagraphs : fallbackContent.aboutParagraphs,
+    ...(result.aboutHeadshotUrl ? {aboutHeadshotUrl: result.aboutHeadshotUrl} : {}),
   };
 }
