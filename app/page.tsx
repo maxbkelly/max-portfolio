@@ -193,6 +193,16 @@ export default function Home() {
       .then((nextContent) => {
         setContent(nextContent);
         setCategory((current) => nextContent.sections.some((section) => section.id === current) ? current : nextContent.sections[0].id);
+        // Decided in this same tick (batched with setContent above) so the
+        // hero iframe's src changes once, not twice: computing this
+        // separately in a later effect keyed on [content] meant content
+        // landed first (fallback reel -> real reel, one src swap), then the
+        // mobile-specific reel applied a beat later (a second src swap) —
+        // two real Vimeo reloads back to back on a mobile network, fragile
+        // enough that the second one could leave the reel stuck.
+        if (nextContent.homepageReelMobile && window.matchMedia("(pointer: coarse)").matches) {
+          setHeroVimeoOverride(nextContent.homepageReelMobile);
+        }
       })
       .catch(() => { /* Keep the built-in content if Sanity is unavailable. */ });
     return () => controller.abort();
@@ -345,17 +355,6 @@ export default function Home() {
     if (window.matchMedia("(pointer: coarse)").matches) setHeroReady(true);
   }, []);
 
-  // Same reasoning as above: an optional 9:16 mobile-specific reel is
-  // applied post-hydration, not baked into the initial render, so it can't
-  // cause a hydration mismatch. Re-checks whenever content changes, since
-  // the mobile reel URL only exists once the real Sanity fetch resolves
-  // (fallbackContent never has one).
-  useLayoutEffect(() => {
-    if (content.homepageReelMobile && window.matchMedia("(pointer: coarse)").matches) {
-      setHeroVimeoOverride(content.homepageReelMobile);
-    }
-  }, [content]);
-
   const heroVimeo = heroVimeoOverride ?? content.homepageReel;
 
   // Browsers correctly pause backgrounded video when a tab isn't visible —
@@ -467,7 +466,6 @@ export default function Home() {
           />
         )}
         <iframe
-          key={heroVimeo.vimeoId}
           ref={heroFrame}
           className="hero-video"
           src={`https://player.vimeo.com/video/${heroVimeo.vimeoId}?${heroVimeo.vimeoHash ? `h=${heroVimeo.vimeoHash}&` : ""}background=1&autoplay=1&loop=1&muted=1&autopause=0&playsinline=1&dnt=1`}
