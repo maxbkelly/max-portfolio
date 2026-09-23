@@ -178,7 +178,6 @@ export default function Home() {
   const [mobileVideoBottom, setMobileVideoBottom] = useState<number | null>(null);
   const [heroMuted, setHeroMuted] = useState(true);
   const [heroReady, setHeroReady] = useState(false);
-  const [heroVimeoOverride, setHeroVimeoOverride] = useState<{ vimeoId: string; vimeoHash?: string } | null>(null);
   const [cursor, setCursor] = useState({ x: 0, y: 0, visible: false });
   const heroFrame = useRef<HTMLIFrameElement>(null);
   const heroPlaceholder = useRef<HTMLVideoElement>(null);
@@ -193,16 +192,6 @@ export default function Home() {
       .then((nextContent) => {
         setContent(nextContent);
         setCategory((current) => nextContent.sections.some((section) => section.id === current) ? current : nextContent.sections[0].id);
-        // Decided in this same tick (batched with setContent above) so the
-        // hero iframe's src changes once, not twice: computing this
-        // separately in a later effect keyed on [content] meant content
-        // landed first (fallback reel -> real reel, one src swap), then the
-        // mobile-specific reel applied a beat later (a second src swap) —
-        // two real Vimeo reloads back to back on a mobile network, fragile
-        // enough that the second one could leave the reel stuck.
-        if (nextContent.homepageReelMobile && window.matchMedia("(pointer: coarse)").matches) {
-          setHeroVimeoOverride(nextContent.homepageReelMobile);
-        }
       })
       .catch(() => { /* Keep the built-in content if Sanity is unavailable. */ });
     return () => controller.abort();
@@ -355,8 +344,6 @@ export default function Home() {
     if (window.matchMedia("(pointer: coarse)").matches) setHeroReady(true);
   }, []);
 
-  const heroVimeo = heroVimeoOverride ?? content.homepageReel;
-
   // Browsers correctly pause backgrounded video when a tab isn't visible —
   // switching apps, checking a setting, even opening Control Center all
   // trigger this. Nothing resumes it automatically once the page is visible
@@ -468,7 +455,7 @@ export default function Home() {
         <iframe
           ref={heroFrame}
           className="hero-video"
-          src={`https://player.vimeo.com/video/${heroVimeo.vimeoId}?${heroVimeo.vimeoHash ? `h=${heroVimeo.vimeoHash}&` : ""}background=1&autoplay=1&loop=1&muted=1&autopause=0&playsinline=1&dnt=1`}
+          src={`https://player.vimeo.com/video/${content.homepageReel.vimeoId}?${content.homepageReel.vimeoHash ? `h=${content.homepageReel.vimeoHash}&` : ""}background=1&autoplay=1&loop=1&muted=1&autopause=0&playsinline=1&dnt=1`}
           title="Maximilian Kelly editors reel"
           allow="autoplay; fullscreen; picture-in-picture"
           onLoad={subscribeHeroEvents}
