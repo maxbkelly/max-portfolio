@@ -169,6 +169,7 @@ function VideoTile({ project, onOpen }: { project: Project; onOpen: () => void }
 
 export default function Home() {
   const [content, setContent] = useState(fallbackContent);
+  const [contentReady, setContentReady] = useState(false);
   const [category, setCategory] = useState(fallbackContent.sections[0].id);
   const [viewerIndex, setViewerIndex] = useState<number | null>(null);
   const [showWork, setShowWork] = useState(false);
@@ -194,7 +195,8 @@ export default function Home() {
         setContent(nextContent);
         setCategory((current) => nextContent.sections.some((section) => section.id === current) ? current : nextContent.sections[0].id);
       })
-      .catch(() => { /* Keep the built-in content if Sanity is unavailable. */ });
+      .catch(() => { /* Keep the built-in content if Sanity is unavailable. */ })
+      .finally(() => setContentReady(true));
     return () => controller.abort();
   }, []);
 
@@ -448,7 +450,7 @@ export default function Home() {
       <header className="topbar">
         <button className="wordmark" onClick={() => window.scrollTo({ top: 0, behavior: "smooth" })}>{content.siteTitle}</button>
         <nav aria-label="Main navigation">
-          {content.sections.map((section) => <button key={section.id} onClick={() => choose(section.id)}>{section.title}</button>)}
+          {contentReady && content.sections.map((section) => <button key={section.id} onClick={() => choose(section.id)}>{section.title}</button>)}
           <button onClick={() => document.querySelector("#about")?.scrollIntoView({ behavior: "smooth" })}>ABOUT</button>
         </nav>
       </header>
