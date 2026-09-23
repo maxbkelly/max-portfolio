@@ -25,6 +25,7 @@ function measureRenderedWidth(text: string, referenceStyle: CSSStyleDeclaration)
 
 function VideoTile({ project, onOpen }: { project: Project; onOpen: () => void }) {
   const frame = useRef<HTMLIFrameElement>(null);
+  const preview = useRef<HTMLVideoElement>(null);
   const dimensions = useRef<{ width?: number; height?: number }>({});
   const dimensionPoll = useRef<ReturnType<typeof setInterval> | null>(null);
   const projectNameRef = useRef<HTMLSpanElement>(null);
@@ -126,8 +127,15 @@ function VideoTile({ project, onOpen }: { project: Project; onOpen: () => void }
     <article
       className="project-tile"
       style={{ "--accent": project.accent } as React.CSSProperties}
-      onMouseEnter={() => setActive(true)}
-      onMouseLeave={() => setActive(false)}
+      onMouseEnter={() => {
+        setActive(true);
+        preview.current?.play().catch(() => {});
+      }}
+      onMouseLeave={() => {
+        setActive(false);
+        const el = preview.current;
+        if (el) { el.pause(); el.currentTime = 0; }
+      }}
       onMouseMove={trackCursor}
     >
       <button className="tile-hit" onClick={onOpen} aria-label={`Play ${project.title}`}>
@@ -146,6 +154,17 @@ function VideoTile({ project, onOpen }: { project: Project; onOpen: () => void }
         />
         {project.thumbnailUrl && (
           <img src={project.thumbnailUrl} alt="" className="tile-thumbnail" />
+        )}
+        {project.hoverPreviewUrl && (
+          <video
+            ref={preview}
+            src={project.hoverPreviewUrl}
+            className={`tile-preview ${active ? "visible" : ""}`}
+            muted
+            loop
+            playsInline
+            preload="none"
+          />
         )}
         <span className="tile-shade" />
       </button>

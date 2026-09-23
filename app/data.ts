@@ -14,6 +14,7 @@ export type Project = {
   accent: string;
   credits?: Credit[];
   thumbnailUrl?: string;
+  hoverPreviewUrl?: string;
 };
 
 export type PortfolioSection = {
@@ -104,7 +105,7 @@ const query = `*[_type == "siteSettings" && _id == "siteSettings"][0]{
       enabled,
       "projects": projects[]{
         "placementId": _key,
-        ...@->{_id, title, client, projectName, vimeoUrl, accent, credits, "thumbnailUrl": thumbnail.asset->url + "?w=1000&q=75&auto=format"}
+        ...@->{_id, title, client, projectName, vimeoUrl, accent, credits, "thumbnailUrl": thumbnail.asset->url + "?w=1000&q=75&auto=format", "hoverPreviewUrl": hoverPreview.asset->url}
       }
     }
   }
@@ -133,6 +134,7 @@ type SanityResponse = {
         accent?: string;
         credits?: Credit[];
         thumbnailUrl?: string;
+        hoverPreviewUrl?: string;
       }>;
     }>;
   };
@@ -163,6 +165,7 @@ export async function loadCmsContent(signal?: AbortSignal): Promise<PortfolioCon
           ...(project.client && project.projectName ? {client: project.client, projectName: project.projectName} : {}),
           ...(project.credits?.length ? {credits: project.credits} : {}),
           ...(project.thumbnailUrl ? {thumbnailUrl: project.thumbnailUrl} : {}),
+          ...(project.hoverPreviewUrl ? {hoverPreviewUrl: project.hoverPreviewUrl} : {}),
           ...video,
         }];
       }),
