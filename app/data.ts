@@ -104,7 +104,7 @@ const query = `*[_type == "siteSettings" && _id == "siteSettings"][0]{
       enabled,
       "projects": projects[]{
         "placementId": _key,
-        ...@->{_id, title, client, projectName, vimeoUrl, accent, credits, "thumbnailUrl": thumbnail.asset->url}
+        ...@->{_id, title, client, projectName, vimeoUrl, accent, credits, "thumbnailUrl": thumbnail.asset->url + "?w=1000&q=75&auto=format"}
       }
     }
   }

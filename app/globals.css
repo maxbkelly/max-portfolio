@@ -28,7 +28,7 @@ nav button:hover::after { right: 0; }
 .hero-sound:hover::after { right: 0; }
 .eyebrow { font-size: 10px; letter-spacing: .22em; margin: 0 0 20px; }
 .work { min-height: 100vh; padding: 120px 3vw 170px; }
-.grid { display: grid; grid-template-columns: repeat(3, 26%); justify-content: space-between; column-gap: 0; row-gap: 7.2vw; }
+.grid { display: grid; grid-template-columns: repeat(4, 22%); justify-content: space-between; column-gap: 0; row-gap: 7.2vw; }
 .tile-hit { display: block; width: 100%; aspect-ratio: 1; position: relative; overflow: hidden; background: var(--accent); padding: 0; }
 .tile-hit iframe { position: absolute; top: 50%; left: 50%; width: 177.78%; height: 100%; border: 0; transform: translate(-50%, -50%) scale(1.02); pointer-events: none; transition: transform .8s cubic-bezier(.2,.7,.2,1); }
 .project-tile:hover iframe { transform: translate(-50%, -50%) scale(1.07); }
