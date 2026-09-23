@@ -34,9 +34,16 @@ export const projectType = defineType({
     defineField({
       name: "thumbnail",
       title: "Custom thumbnail",
-      description: "Optional. Shown in the grid instead of the video's own frame; hovering still plays the video preview as usual. Leave blank to keep showing the video frame.",
+      description: "Optional. Shown in the grid instead of the video's own frame. Leave blank to keep showing the video frame.",
       type: "image",
       options: {hotspot: true},
+    }),
+    defineField({
+      name: "hoverPreview",
+      title: "Hover preview clip",
+      description: "Optional. A short (under 5 seconds), low-resolution, silent video — a few key moments cut together — that plays in place of the thumbnail while someone hovers over this project in the grid. Leave blank to just show the thumbnail with a subtle zoom on hover.",
+      type: "file",
+      options: {accept: "video/mp4"},
     }),
     defineField({
       name: "description",
