@@ -1,6 +1,6 @@
 @import "tailwindcss";
 
-:root { --ink: #f1eee8; --paper: #10100f; --muted: #9d9a93; --font-ui: "Arial Narrow", "Helvetica Neue Condensed", "Helvetica Neue", Arial, sans-serif; }
+:root { --ink: #f1eee8; --paper: #000000; --muted: #9d9a93; --font-ui: "Arial Narrow", "Helvetica Neue Condensed", "Helvetica Neue", Arial, sans-serif; }
 * { box-sizing: border-box; }
 html { scroll-behavior: smooth; background: var(--paper); }
 body { margin: 0; background: var(--paper); color: var(--ink); font-family: var(--font-ui); }
