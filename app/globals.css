@@ -12,7 +12,7 @@ nav { display: flex; gap: clamp(16px, 3vw, 48px); }
 nav button { font-size: 11px; letter-spacing: .14em; position: relative; padding: 8px 0; }
 nav button::after { content: ""; position: absolute; left: 0; right: 100%; bottom: 2px; height: 1px; background: currentColor; transition: right .3s; }
 nav button:hover::after { right: 0; }
-.hero { height: 100svh; min-height: 600px; position: relative; overflow: hidden; background: #151515; }
+.hero { height: 100svh; min-height: 600px; position: relative; overflow: hidden; background: #151515; cursor: pointer; }
 .hero-video { position: absolute; top: 50%; left: 50%; width: 177.78vh; height: 100vh; min-width: 100vw; min-height: 56.25vw; border: 0; transform: translate(-50%, -50%); pointer-events: none; filter: saturate(1) contrast(1.02); opacity: 1; object-fit: cover; }
 .hero-placeholder { z-index: 1; }
 @media (pointer: coarse) {

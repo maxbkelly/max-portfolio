@@ -453,7 +453,7 @@ export default function Home() {
         </nav>
       </header>
 
-      <section className="hero" aria-label="Featured reel">
+      <section className="hero" aria-label="Featured reel" onClick={toggleHeroSound}>
         {!heroReady && (
           <video
             ref={heroPlaceholder}
