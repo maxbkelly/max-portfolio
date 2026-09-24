@@ -593,6 +593,20 @@ export default function Home() {
             onClick={(event) => { event.currentTarget.play().catch(() => {}); }}
           />
         )}
+        {/* Mobile-only experiment: a GIF animates on its own with no
+            autoplay permission involved at all, sidestepping the exact
+            class of phone autoplay-policy trouble that got the video
+            placeholder disabled on mobile in the first place. Desktop is
+            untouched — it still only ever shows the video placeholder
+            above. */}
+        {heroIsMobileRef.current && !heroSourceReady && (
+          <img
+            src="/hero-placeholder.gif"
+            className="hero-video hero-placeholder"
+            alt=""
+            aria-hidden="true"
+          />
+        )}
         {heroSourceReady && (() => {
           const heroVimeo = heroIsMobileRef.current && content.homepageReelMobile ? content.homepageReelMobile : content.homepageReel;
           return (
