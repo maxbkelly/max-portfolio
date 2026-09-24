@@ -565,12 +565,19 @@ export default function Home() {
     const poll = window.setInterval(() => {
       attempts += 1;
       player?.postMessage({ method: "getPaused" }, "https://player.vimeo.com");
-      if (attempts >= 25) window.clearInterval(poll);
+      if (attempts >= 40) window.clearInterval(poll);
     }, 200);
     // Safety net: however detection fails (slow network, a browser quirk in
     // postMessage timing, autoplay blocked entirely), the placeholder must
-    // never loop forever — force the cut over after a few seconds regardless.
-    window.setTimeout(() => setHeroReady(true), 3000);
+    // never loop forever — force the cut over regardless once polling above
+    // has had its full chance. This used to fire at 3s, before the poll's
+    // own 5s window even finished — on a slow connection the iframe's own
+    // document can finish loading well before Vimeo has buffered a visible
+    // frame, so that early cutover was hiding the placeholder in favor of
+    // nothing (the hero's bare background) rather than the real video. Safe
+    // to wait this much longer now that the placeholder loop itself is
+    // smooth (see HERO_PLACEHOLDER_URL) instead of glitching on every cycle.
+    window.setTimeout(() => setHeroReady(true), 8500);
   };
 
   const toggleHeroSound = () => {
