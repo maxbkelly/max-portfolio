@@ -301,9 +301,18 @@ export default function Home() {
   // aspect ratio doesn't match the container's, so the progress bar and
   // fullscreen button (which need to hug the video's own edges, not the
   // container's) have to be positioned against the actual rendered video
-  // rectangle rather than the fixed-inset box around it. This also
-  // supplies the mobile credit/counter's bottom-edge positioning, which
-  // previously computed only the bottom coordinate inline.
+  // rectangle rather than the fixed-inset box around it.
+  //
+  // This is expressed in PERCENTAGES of .viewer-media, not pixels, and
+  // that's deliberate: zooming in/out changes .viewer-media's inset by the
+  // same 7.5vh/7.5vw on every side, which scales its width and height by
+  // the same factor and so never changes its aspect ratio — meaning the
+  // letterboxed video's position as a percentage of the container is
+  // IDENTICAL whether zoomed in or out. A percentage-based rect therefore
+  // tracks .viewer-media's own CSS transition natively, every frame, with
+  // no JS involved in the animation at all. (An earlier pixel-based
+  // version had to re-measure on a timer/transitionend and always lagged
+  // a frame behind, snapping into place instead of animating smoothly.)
   useEffect(() => {
     if (viewerIndex === null || !dimensionsKnown) return;
     const updateVideoRect = () => {
@@ -313,29 +322,23 @@ export default function Home() {
       const containerAspect = bounds.width / bounds.height;
       let rect;
       if (videoAspect > containerAspect) {
-        const height = bounds.width / videoAspect;
-        rect = { left: 0, top: (bounds.height - height) / 2, width: bounds.width, height };
+        const heightPercent = (containerAspect / videoAspect) * 100;
+        rect = { left: 0, top: (100 - heightPercent) / 2, width: 100, height: heightPercent };
       } else {
-        const width = bounds.height * videoAspect;
-        rect = { left: (bounds.width - width) / 2, top: 0, width, height: bounds.height };
+        const widthPercent = (videoAspect / containerAspect) * 100;
+        rect = { left: (100 - widthPercent) / 2, top: 0, width: widthPercent, height: 100 };
       }
       setVideoRect(rect);
-      setMobileVideoBottom(bounds.top + rect.top + rect.height);
+      setMobileVideoBottom(bounds.top + (rect.top / 100) * bounds.height + (rect.height / 100) * bounds.height);
     };
     updateVideoRect();
     window.addEventListener("resize", updateVideoRect);
     window.addEventListener("orientationchange", updateVideoRect);
-    // The zoom transition animates .viewer-media's own size over ~550ms, so
-    // the rect measured the instant zoom toggles is already stale by the
-    // time the frame settles — re-measure once the transition finishes.
-    const mediaEl = viewerMedia.current;
-    mediaEl?.addEventListener("transitionend", updateVideoRect);
     return () => {
       window.removeEventListener("resize", updateVideoRect);
       window.removeEventListener("orientationchange", updateVideoRect);
-      mediaEl?.removeEventListener("transitionend", updateVideoRect);
     };
-  }, [viewerIndex, viewerDimensions, dimensionsKnown, viewerZoomOut]);
+  }, [viewerIndex, viewerDimensions, dimensionsKnown]);
 
   useEffect(() => {
     const onFullscreenChange = () => setViewerFullscreen(document.fullscreenElement === viewerRoot.current);
@@ -626,7 +629,7 @@ export default function Home() {
           <div className="viewer-media" ref={viewerMedia}>
             <div
               className="viewer-video-rect"
-              style={videoRect ? { left: videoRect.left, top: videoRect.top, width: videoRect.width, height: videoRect.height } : undefined}
+              style={videoRect ? { left: `${videoRect.left}%`, top: `${videoRect.top}%`, width: `${videoRect.width}%`, height: `${videoRect.height}%` } : undefined}
             >
               <iframe
                 ref={viewerFrame}
