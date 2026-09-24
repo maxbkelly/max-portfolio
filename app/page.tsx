@@ -233,6 +233,18 @@ export default function Home() {
     return () => controller.abort();
   }, []);
 
+  // Loaded after mount instead of in the document head, so it doesn't
+  // compete with the hero reel for bandwidth during initial load — it's
+  // only used by the About section, well below the fold, so there's no
+  // rush to have it before the page even paints.
+  useEffect(() => {
+    const link = document.createElement("link");
+    link.rel = "stylesheet";
+    link.href = "https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;500&display=swap";
+    document.head.appendChild(link);
+    return () => { link.remove(); };
+  }, []);
+
   const close = useCallback(() => {
     setViewerIndex(null);
     setViewerPlaying(false);
