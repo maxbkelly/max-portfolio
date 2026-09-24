@@ -194,6 +194,7 @@ export default function Home() {
   const [showWork, setShowWork] = useState(false);
   const [viewerPlaying, setViewerPlaying] = useState(false);
   const [viewerAtEdge, setViewerAtEdge] = useState(false);
+  const [viewerZoomOut, setViewerZoomOut] = useState(false);
   const [viewerDimensions, setViewerDimensions] = useState({ width: 16, height: 9 });
   const [viewerProgress, setViewerProgress] = useState({ seconds: 0, duration: 0 });
   const [videoRect, setVideoRect] = useState<{ top: number; left: number; width: number; height: number } | null>(null);
@@ -324,11 +325,17 @@ export default function Home() {
     updateVideoRect();
     window.addEventListener("resize", updateVideoRect);
     window.addEventListener("orientationchange", updateVideoRect);
+    // The zoom transition animates .viewer-media's own size over ~550ms, so
+    // the rect measured the instant zoom toggles is already stale by the
+    // time the frame settles — re-measure once the transition finishes.
+    const mediaEl = viewerMedia.current;
+    mediaEl?.addEventListener("transitionend", updateVideoRect);
     return () => {
       window.removeEventListener("resize", updateVideoRect);
       window.removeEventListener("orientationchange", updateVideoRect);
+      mediaEl?.removeEventListener("transitionend", updateVideoRect);
     };
-  }, [viewerIndex, viewerDimensions, dimensionsKnown]);
+  }, [viewerIndex, viewerDimensions, dimensionsKnown, viewerZoomOut]);
 
   useEffect(() => {
     const onFullscreenChange = () => setViewerFullscreen(document.fullscreenElement === viewerRoot.current);
@@ -416,6 +423,12 @@ export default function Home() {
     }
 
     setViewerAtEdge(atEdge);
+    // Deliberately horizontal-only (ignores clientY): the progress bar and
+    // fullscreen button live at the bottom of the frame, so if this also
+    // reacted to vertical position, moving down to reach them would zoom
+    // the frame at the same time — a moving target right when precision
+    // matters most.
+    setViewerZoomOut(event.clientX < edgeX || event.clientX > window.innerWidth - edgeX);
     setCursor({ x: event.clientX, y: event.clientY, visible: true });
   };
 
@@ -599,7 +612,7 @@ export default function Home() {
 
       {current && (
         <div
-          className={`viewer ${viewerAtEdge ? "at-edge" : ""} ${viewerPlaying ? "is-playing" : ""}`}
+          className={`viewer ${viewerAtEdge ? "at-edge" : ""} ${viewerPlaying ? "is-playing" : ""} ${viewerZoomOut ? "zoom-out" : ""}`}
           data-orientation={viewerDimensions.width >= viewerDimensions.height ? "horizontal" : "vertical"}
           style={{ "--mobile-credit-top": mobileVideoBottom !== null ? `${mobileVideoBottom}px` : undefined } as React.CSSProperties}
           role="dialog"
