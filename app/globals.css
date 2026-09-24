@@ -56,6 +56,11 @@ nav button:hover::after { right: 0; }
 @keyframes reveal { from { clip-path: inset(42% 42% 42% 42%); opacity: 0 } to { clip-path: inset(0); opacity: 1 } }
 .viewer-media { position: absolute; inset: 7.5vh 7.5vw; }
 .viewer:fullscreen .viewer-media { inset: 0; }
+.viewer:fullscreen .viewer-top,
+.viewer:fullscreen .viewer-arrow,
+.viewer:fullscreen .viewer-credit,
+.viewer:fullscreen .viewer-count,
+.viewer:fullscreen .viewer-cursor { display: none; }
 .viewer-video-rect { position: absolute; inset: 0; }
 .viewer-video-rect iframe { width: 100%; height: 100%; border: 0; pointer-events: none; display: block; }
 .viewer-progress { position: absolute; left: 16px; right: 52px; bottom: 16px; height: 16px; display: flex; align-items: center; cursor: pointer; z-index: 3; }
@@ -68,7 +73,7 @@ nav button:hover::after { right: 0; }
 .viewer-top > span { display: inline-block; width: fit-content; padding: 5px 9px 4px; border-radius: 2px; background: rgba(5,5,5,.82); line-height: 1; }
 .viewer-mobile-close { display: none; pointer-events: auto; }
 .viewer-arrow { position: absolute; top: 50%; z-index: 2; font-size: 34px; width: 70px; height: 70px; cursor: pointer; }
-.viewer-arrow.previous { left: 10vw; }.viewer-arrow.next { right: 10vw; }
+.viewer-arrow.previous { left: 3vw; }.viewer-arrow.next { right: 3vw; }
 .viewer-count { position: absolute; bottom: 25px; left: 50%; transform: translateX(-50%); font-size: 9px; letter-spacing: .18em; pointer-events: none; transition: opacity .4s; }
 .viewer-count.faded { opacity: 0; }
 .viewer-credit { position: absolute; bottom: 44px; left: 50%; transform: translateX(-50%); font-size: 10px; letter-spacing: .08em; text-transform: uppercase; opacity: .75; pointer-events: none; white-space: nowrap; transition: opacity .4s; }

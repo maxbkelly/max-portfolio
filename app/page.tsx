@@ -197,6 +197,7 @@ export default function Home() {
   const [viewerDimensions, setViewerDimensions] = useState({ width: 16, height: 9 });
   const [viewerProgress, setViewerProgress] = useState({ seconds: 0, duration: 0 });
   const [videoRect, setVideoRect] = useState<{ top: number; left: number; width: number; height: number } | null>(null);
+  const [dimensionsKnown, setDimensionsKnown] = useState(false);
   const [viewerFullscreen, setViewerFullscreen] = useState(false);
   const [mobileVideoBottom, setMobileVideoBottom] = useState<number | null>(null);
   const [heroMuted, setHeroMuted] = useState(true);
@@ -230,6 +231,14 @@ export default function Home() {
   const move = useCallback((direction: number) => {
     setViewerPlaying(false);
     setViewerAtEdge(false);
+    // Cleared here, synchronously with the index change, rather than only in
+    // the dimensions-reset effect that follows — otherwise the previous
+    // video's rect (or dimensions-reset effect racing against the rect
+    // effect on the same render) briefly persists into the new video's
+    // first render, flashing the progress bar/fullscreen button in the
+    // wrong spot before the new aspect ratio is measured.
+    setVideoRect(null);
+    setDimensionsKnown(false);
     setViewerIndex((current) => current === null ? null : (current + direction + visible.length) % visible.length);
   }, [visible.length]);
 
@@ -247,7 +256,10 @@ export default function Home() {
     if (viewerIndex === null) return;
     setViewerDimensions({ width: 16, height: 9 });
     setVideoRect(null);
+    setDimensionsKnown(false);
     setViewerProgress({ seconds: 0, duration: 0 });
+    let widthKnown = false;
+    let heightKnown = false;
 
     const receive = (event: MessageEvent) => {
       if (event.origin !== "https://player.vimeo.com" || event.source !== viewerFrame.current?.contentWindow) return;
@@ -259,10 +271,17 @@ export default function Home() {
         }
         if (data?.method === "getVideoWidth" && Number.isFinite(data.value)) {
           setViewerDimensions((dimensions) => ({ ...dimensions, width: data.value }));
+          widthKnown = true;
         }
         if (data?.method === "getVideoHeight" && Number.isFinite(data.value)) {
           setViewerDimensions((dimensions) => ({ ...dimensions, height: data.value }));
+          heightKnown = true;
         }
+        // Both dimensions land in separate messages, so only trust
+        // viewerDimensions for layout once both real values are in — the
+        // {16, 9} placeholder it starts at otherwise computes a rect for
+        // the wrong aspect ratio and flashes it before the real one arrives.
+        if (widthKnown && heightKnown) setDimensionsKnown(true);
         if (data?.event === "timeupdate" && data.data) {
           setViewerProgress({ seconds: data.data.seconds, duration: data.data.duration });
         }
@@ -285,7 +304,7 @@ export default function Home() {
   // supplies the mobile credit/counter's bottom-edge positioning, which
   // previously computed only the bottom coordinate inline.
   useEffect(() => {
-    if (viewerIndex === null) return;
+    if (viewerIndex === null || !dimensionsKnown) return;
     const updateVideoRect = () => {
       const bounds = viewerMedia.current?.getBoundingClientRect();
       const videoAspect = viewerDimensions.width / viewerDimensions.height;
@@ -309,7 +328,7 @@ export default function Home() {
       window.removeEventListener("resize", updateVideoRect);
       window.removeEventListener("orientationchange", updateVideoRect);
     };
-  }, [viewerIndex, viewerDimensions]);
+  }, [viewerIndex, viewerDimensions, dimensionsKnown]);
 
   useEffect(() => {
     const onFullscreenChange = () => setViewerFullscreen(document.fullscreenElement === viewerRoot.current);
@@ -605,26 +624,30 @@ export default function Home() {
                 allowFullScreen
                 onLoad={requestViewerDimensions}
               />
-              <div className="viewer-progress" onClick={(event) => event.stopPropagation()} onPointerDown={startSeek}>
-                <div className="viewer-progress-track">
-                  <div
-                    className="viewer-progress-fill"
-                    style={{ width: `${viewerProgress.duration ? (viewerProgress.seconds / viewerProgress.duration) * 100 : 0}%` }}
-                  />
-                </div>
-              </div>
-              <button
-                className="viewer-fullscreen"
-                type="button"
-                onClick={toggleFullscreen}
-                aria-label={viewerFullscreen ? "Exit fullscreen" : "Enter fullscreen"}
-              >
-                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.2" strokeLinecap="round" aria-hidden="true">
-                  <path d="M3 7V3h4" /><path d="M21 7V3h-4" /><path d="M3 17v4h4" /><path d="M21 17v4h-4" />
-                  <path d="M15 9l2.3-2.3" /><path d="M17.3 8v-1.3h-1.3" />
-                  <path d="M9 15l-2.3 2.3" /><path d="M6.7 16v1.3h1.3" />
-                </svg>
-              </button>
+              {videoRect && (
+                <>
+                  <div className="viewer-progress" onClick={(event) => event.stopPropagation()} onPointerDown={startSeek}>
+                    <div className="viewer-progress-track">
+                      <div
+                        className="viewer-progress-fill"
+                        style={{ width: `${viewerProgress.duration ? (viewerProgress.seconds / viewerProgress.duration) * 100 : 0}%` }}
+                      />
+                    </div>
+                  </div>
+                  <button
+                    className="viewer-fullscreen"
+                    type="button"
+                    onClick={toggleFullscreen}
+                    aria-label={viewerFullscreen ? "Exit fullscreen" : "Enter fullscreen"}
+                  >
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.2" strokeLinecap="round" aria-hidden="true">
+                      <path d="M3 7V3h4" /><path d="M21 7V3h-4" /><path d="M3 17v4h4" /><path d="M21 17v4h-4" />
+                      <path d="M15 9l2.3-2.3" /><path d="M17.3 8v-1.3h-1.3" />
+                      <path d="M9 15l-2.3 2.3" /><path d="M6.7 16v1.3h1.3" />
+                    </svg>
+                  </button>
+                </>
+              )}
             </div>
           </div>
           <div className="viewer-top"><span>{current.title}</span><button className="viewer-mobile-close" onClick={(event) => { event.stopPropagation(); close(); }} aria-label="Close video">CLOSE ×</button></div>
