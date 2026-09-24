@@ -411,9 +411,14 @@ export default function Home() {
   const trackViewerCursor = (event: React.MouseEvent<HTMLDivElement>) => {
     const bounds = viewerMedia.current?.getBoundingClientRect();
     const videoAspect = viewerDimensions.width / viewerDimensions.height;
+    // The bottom 5% of the screen is a dead zone for this: it's where the
+    // progress bar and fullscreen button live, and without this, scrubbing
+    // to either end of the bar would still cross into the horizontal edge
+    // trigger and zoom/close the frame out from under the cursor.
+    const inControlZone = event.clientY > window.innerHeight * 0.95;
     let atEdge = false;
 
-    if (bounds && Number.isFinite(videoAspect) && videoAspect > 0) {
+    if (!inControlZone && bounds && Number.isFinite(videoAspect) && videoAspect > 0) {
       const containerAspect = bounds.width / bounds.height;
       const innerTrigger = Math.min(48, window.innerWidth * 0.03);
       // Pillarboxed video: its real left/right edges sit inside the frame,
