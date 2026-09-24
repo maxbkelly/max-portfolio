@@ -55,7 +55,7 @@ nav button:hover::after { right: 0; }
 .viewer.at-edge { cursor: default; }
 @keyframes reveal { from { clip-path: inset(42% 42% 42% 42%); opacity: 0 } to { clip-path: inset(0); opacity: 1 } }
 .viewer-media { position: absolute; inset: 0; transition: inset .55s cubic-bezier(.22,.8,.2,1); }
-.viewer.zoom-out .viewer-media { inset: 7.5vh 7.5vw; }
+.viewer.at-edge .viewer-media { inset: 7.5vh 7.5vw; }
 .viewer:fullscreen .viewer-media { inset: 0; }
 .viewer:fullscreen .viewer-top,
 .viewer:fullscreen .viewer-arrow,

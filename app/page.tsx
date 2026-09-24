@@ -194,7 +194,6 @@ export default function Home() {
   const [showWork, setShowWork] = useState(false);
   const [viewerPlaying, setViewerPlaying] = useState(false);
   const [viewerAtEdge, setViewerAtEdge] = useState(false);
-  const [viewerZoomOut, setViewerZoomOut] = useState(false);
   const [viewerDimensions, setViewerDimensions] = useState({ width: 16, height: 9 });
   const [viewerProgress, setViewerProgress] = useState({ seconds: 0, duration: 0 });
   const [videoRect, setVideoRect] = useState<{ top: number; left: number; width: number; height: number } | null>(null);
@@ -401,37 +400,29 @@ export default function Home() {
     return () => window.removeEventListener("keydown", onKey);
   }, [viewerIndex, close, move, toggleViewer]);
 
+  // Deliberately horizontal-only (ignores clientY): the progress bar and
+  // fullscreen button live at the bottom of the frame, so if closing,
+  // zooming, or the credit/counter fade also reacted to vertical position,
+  // reaching down for those controls would trigger all of that at the same
+  // time — a moving target right when precision matters most.
   const trackViewerCursor = (event: React.MouseEvent<HTMLDivElement>) => {
     const edgeX = window.innerWidth * 0.16;
-    const edgeY = window.innerHeight * 0.13;
-    let atEdge = event.clientX < edgeX || event.clientX > window.innerWidth - edgeX || event.clientY < edgeY || event.clientY > window.innerHeight - edgeY;
+    let atEdge = event.clientX < edgeX || event.clientX > window.innerWidth - edgeX;
     const bounds = viewerMedia.current?.getBoundingClientRect();
     const videoAspect = viewerDimensions.width / viewerDimensions.height;
 
     if (bounds && Number.isFinite(videoAspect) && videoAspect > 0) {
       const containerAspect = bounds.width / bounds.height;
-      const innerTrigger = Math.min(48, window.innerWidth * 0.03);
-
       if (videoAspect < containerAspect) {
+        const innerTrigger = Math.min(48, window.innerWidth * 0.03);
         const videoWidth = bounds.height * videoAspect;
         const videoLeft = bounds.left + (bounds.width - videoWidth) / 2;
         const videoRight = videoLeft + videoWidth;
         atEdge ||= event.clientX < videoLeft + innerTrigger || event.clientX > videoRight - innerTrigger;
-      } else if (videoAspect > containerAspect) {
-        const videoHeight = bounds.width / videoAspect;
-        const videoTop = bounds.top + (bounds.height - videoHeight) / 2;
-        const videoBottom = videoTop + videoHeight;
-        atEdge ||= event.clientY < videoTop + innerTrigger || event.clientY > videoBottom - innerTrigger;
       }
     }
 
     setViewerAtEdge(atEdge);
-    // Deliberately horizontal-only (ignores clientY): the progress bar and
-    // fullscreen button live at the bottom of the frame, so if this also
-    // reacted to vertical position, moving down to reach them would zoom
-    // the frame at the same time — a moving target right when precision
-    // matters most.
-    setViewerZoomOut(event.clientX < edgeX || event.clientX > window.innerWidth - edgeX);
     setCursor({ x: event.clientX, y: event.clientY, visible: true });
   };
 
@@ -615,7 +606,7 @@ export default function Home() {
 
       {current && (
         <div
-          className={`viewer ${viewerAtEdge ? "at-edge" : ""} ${viewerPlaying ? "is-playing" : ""} ${viewerZoomOut ? "zoom-out" : ""}`}
+          className={`viewer ${viewerAtEdge ? "at-edge" : ""} ${viewerPlaying ? "is-playing" : ""}`}
           data-orientation={viewerDimensions.width >= viewerDimensions.height ? "horizontal" : "vertical"}
           style={{ "--mobile-credit-top": mobileVideoBottom !== null ? `${mobileVideoBottom}px` : undefined } as React.CSSProperties}
           role="dialog"
