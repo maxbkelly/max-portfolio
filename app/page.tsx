@@ -594,14 +594,25 @@ export default function Home() {
             onClick={(event) => { event.currentTarget.play().catch(() => {}); }}
           />
         )}
-        <iframe
-          ref={heroFrame}
-          className="hero-video"
-          src={`https://player.vimeo.com/video/${content.homepageReel.vimeoId}?${content.homepageReel.vimeoHash ? `h=${content.homepageReel.vimeoHash}&` : ""}background=1&autoplay=1&loop=1&muted=1&autopause=0&playsinline=1&dnt=1`}
-          title="Maximilian Kelly editors reel"
-          allow="autoplay; fullscreen; picture-in-picture"
-          onLoad={subscribeHeroEvents}
-        />
+        {/* Waits for contentReady instead of mounting immediately with
+            fallbackContent's reel and swapping once Sanity resolves. On a
+            fast connection that swap is invisible, but on slow mobile data
+            the swap happens well after the iframe has made real progress
+            loading the WRONG video — aborting that in-flight load (likely
+            the brief Vimeo error some users saw) and restarting Vimeo's
+            entire bootstrap chain from zero with the right one, roughly
+            doubling the real load time. Mounting once, already knowing the
+            final URL, avoids that entirely. */}
+        {contentReady && (
+          <iframe
+            ref={heroFrame}
+            className="hero-video"
+            src={`https://player.vimeo.com/video/${content.homepageReel.vimeoId}?${content.homepageReel.vimeoHash ? `h=${content.homepageReel.vimeoHash}&` : ""}background=1&autoplay=1&loop=1&muted=1&autopause=0&playsinline=1&dnt=1`}
+            title="Maximilian Kelly editors reel"
+            allow="autoplay; fullscreen; picture-in-picture"
+            onLoad={subscribeHeroEvents}
+          />
+        )}
         <button
           className="hero-sound hero-sound-desktop"
           type="button"
