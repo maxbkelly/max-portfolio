@@ -525,12 +525,44 @@ export default function Home() {
   // which is all React's muted prop reliably sets) right before playing,
   // since muted+playsinline is exactly what Apple's own autoplay
   // allowance is meant to cover.
+  //
+  // Fetches the file into memory first instead of handing the CDN URL
+  // straight to <video src>: confirmed via a real screen recording on a
+  // slow connection that native `loop` isn't reliable there — instead of
+  // looping, it plays through once and then just sits frozen on its last
+  // frame for many seconds. The video element's own progressive buffer
+  // apparently doesn't guarantee byte 0 is still available to seek back to
+  // once the network is genuinely slow, regardless of Range support. The
+  // file is only ~225KB, so fetching it whole up front costs about as much
+  // as letting the browser buffer "enough to start" would anyway, and once
+  // it's a blob: URL every subsequent loop is a local memory seek — no
+  // network involved, so it can't stall no matter how slow the connection.
   useEffect(() => {
     const el = heroPlaceholder.current;
     if (!el) return;
-    el.muted = true;
-    el.setAttribute("muted", "");
-    el.play().catch(() => { /* Ignored: worst case it shows a static first frame. */ });
+    let objectUrl: string | null = null;
+    let cancelled = false;
+    const start = (src: string) => {
+      if (cancelled) return;
+      el.src = src;
+      el.muted = true;
+      el.setAttribute("muted", "");
+      el.play().catch(() => { /* Ignored: worst case it shows a static first frame. */ });
+    };
+    fetch(HERO_PLACEHOLDER_URL)
+      .then((response) => response.blob())
+      .then((blob) => {
+        if (cancelled) return;
+        objectUrl = URL.createObjectURL(blob);
+        start(objectUrl);
+      })
+      // If even the fetch fails, fall back to a direct src — still subject
+      // to the same loop unreliability, but better than showing nothing.
+      .catch(() => start(HERO_PLACEHOLDER_URL));
+    return () => {
+      cancelled = true;
+      if (objectUrl) URL.revokeObjectURL(objectUrl);
+    };
   }, []);
 
   // The local placeholder plays instantly (no iframe/network handshake);
@@ -613,7 +645,6 @@ export default function Home() {
           <video
             ref={heroPlaceholder}
             className="hero-video hero-placeholder"
-            src={HERO_PLACEHOLDER_URL}
             muted
             loop
             playsInline
