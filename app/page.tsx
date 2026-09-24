@@ -195,6 +195,10 @@ export default function Home() {
   const [viewerPlaying, setViewerPlaying] = useState(false);
   const [viewerAtEdge, setViewerAtEdge] = useState(false);
   const [viewerDimensions, setViewerDimensions] = useState({ width: 16, height: 9 });
+  const [viewerProgress, setViewerProgress] = useState({ seconds: 0, duration: 0 });
+  const [videoRect, setVideoRect] = useState<{ top: number; left: number; width: number; height: number } | null>(null);
+  const [dimensionsKnown, setDimensionsKnown] = useState(false);
+  const [viewerFullscreen, setViewerFullscreen] = useState(false);
   const [mobileVideoBottom, setMobileVideoBottom] = useState<number | null>(null);
   const [heroMuted, setHeroMuted] = useState(true);
   const [heroReady, setHeroReady] = useState(false);
@@ -204,6 +208,7 @@ export default function Home() {
   const heroPlaceholder = useRef<HTMLVideoElement>(null);
   const viewerFrame = useRef<HTMLIFrameElement>(null);
   const viewerMedia = useRef<HTMLDivElement>(null);
+  const viewerRoot = useRef<HTMLDivElement>(null);
   const activeSection = content.sections.find((section) => section.id === category) || content.sections[0];
   const visible = activeSection?.projects || [];
 
@@ -226,6 +231,14 @@ export default function Home() {
   const move = useCallback((direction: number) => {
     setViewerPlaying(false);
     setViewerAtEdge(false);
+    // Cleared here, synchronously with the index change, rather than only in
+    // the dimensions-reset effect that follows — otherwise the previous
+    // video's rect (or dimensions-reset effect racing against the rect
+    // effect on the same render) briefly persists into the new video's
+    // first render, flashing the progress bar/fullscreen button in the
+    // wrong spot before the new aspect ratio is measured.
+    setVideoRect(null);
+    setDimensionsKnown(false);
     setViewerIndex((current) => current === null ? null : (current + direction + visible.length) % visible.length);
   }, [visible.length]);
 
@@ -242,17 +255,35 @@ export default function Home() {
   useEffect(() => {
     if (viewerIndex === null) return;
     setViewerDimensions({ width: 16, height: 9 });
+    setVideoRect(null);
+    setDimensionsKnown(false);
+    setViewerProgress({ seconds: 0, duration: 0 });
+    let widthKnown = false;
+    let heightKnown = false;
 
     const receive = (event: MessageEvent) => {
       if (event.origin !== "https://player.vimeo.com" || event.source !== viewerFrame.current?.contentWindow) return;
       try {
         const data = typeof event.data === "string" ? JSON.parse(event.data) : event.data;
-        if (data?.event === "ready") requestViewerDimensions();
+        if (data?.event === "ready") {
+          requestViewerDimensions();
+          viewerFrame.current?.contentWindow?.postMessage({ method: "addEventListener", value: "timeupdate" }, "https://player.vimeo.com");
+        }
         if (data?.method === "getVideoWidth" && Number.isFinite(data.value)) {
           setViewerDimensions((dimensions) => ({ ...dimensions, width: data.value }));
+          widthKnown = true;
         }
         if (data?.method === "getVideoHeight" && Number.isFinite(data.value)) {
           setViewerDimensions((dimensions) => ({ ...dimensions, height: data.value }));
+          heightKnown = true;
+        }
+        // Both dimensions land in separate messages, so only trust
+        // viewerDimensions for layout once both real values are in — the
+        // {16, 9} placeholder it starts at otherwise computes a rect for
+        // the wrong aspect ratio and flashes it before the real one arrives.
+        if (widthKnown && heightKnown) setDimensionsKnown(true);
+        if (data?.event === "timeupdate" && data.data) {
+          setViewerProgress({ seconds: data.data.seconds, duration: data.data.duration });
         }
       } catch { /* Ignore unrelated player messages. */ }
     };
@@ -265,31 +296,75 @@ export default function Home() {
     };
   }, [viewerIndex, requestViewerDimensions]);
 
-  // On mobile, a horizontal video's bottom edge (past its letterboxed
-  // margin) is where the credit/counter text should sit, instead of the
-  // desktop's fixed distance from the screen's own bottom edge.
+  // The video letterboxes/pillarboxes inside .viewer-media whenever its
+  // aspect ratio doesn't match the container's, so the progress bar and
+  // fullscreen button (which need to hug the video's own edges, not the
+  // container's) have to be positioned against the actual rendered video
+  // rectangle rather than the fixed-inset box around it. This also
+  // supplies the mobile credit/counter's bottom-edge positioning, which
+  // previously computed only the bottom coordinate inline.
   useEffect(() => {
-    if (viewerIndex === null) return;
-    const updateVideoBottom = () => {
+    if (viewerIndex === null || !dimensionsKnown) return;
+    const updateVideoRect = () => {
       const bounds = viewerMedia.current?.getBoundingClientRect();
       const videoAspect = viewerDimensions.width / viewerDimensions.height;
       if (!bounds || !Number.isFinite(videoAspect) || videoAspect <= 0) return;
       const containerAspect = bounds.width / bounds.height;
+      let rect;
       if (videoAspect > containerAspect) {
-        const videoHeight = bounds.width / videoAspect;
-        setMobileVideoBottom(bounds.top + (bounds.height + videoHeight) / 2);
+        const height = bounds.width / videoAspect;
+        rect = { left: 0, top: (bounds.height - height) / 2, width: bounds.width, height };
       } else {
-        setMobileVideoBottom(bounds.bottom);
+        const width = bounds.height * videoAspect;
+        rect = { left: (bounds.width - width) / 2, top: 0, width, height: bounds.height };
       }
+      setVideoRect(rect);
+      setMobileVideoBottom(bounds.top + rect.top + rect.height);
     };
-    updateVideoBottom();
-    window.addEventListener("resize", updateVideoBottom);
-    window.addEventListener("orientationchange", updateVideoBottom);
+    updateVideoRect();
+    window.addEventListener("resize", updateVideoRect);
+    window.addEventListener("orientationchange", updateVideoRect);
     return () => {
-      window.removeEventListener("resize", updateVideoBottom);
-      window.removeEventListener("orientationchange", updateVideoBottom);
+      window.removeEventListener("resize", updateVideoRect);
+      window.removeEventListener("orientationchange", updateVideoRect);
     };
-  }, [viewerIndex, viewerDimensions]);
+  }, [viewerIndex, viewerDimensions, dimensionsKnown]);
+
+  useEffect(() => {
+    const onFullscreenChange = () => setViewerFullscreen(document.fullscreenElement === viewerRoot.current);
+    document.addEventListener("fullscreenchange", onFullscreenChange);
+    return () => document.removeEventListener("fullscreenchange", onFullscreenChange);
+  }, []);
+
+  const toggleFullscreen = useCallback((event: React.MouseEvent) => {
+    event.stopPropagation();
+    if (document.fullscreenElement) {
+      document.exitFullscreen();
+    } else {
+      viewerRoot.current?.requestFullscreen();
+    }
+  }, []);
+
+  const seekViewer = useCallback((clientX: number, bounds: DOMRect) => {
+    if (!viewerProgress.duration) return;
+    const ratio = Math.min(1, Math.max(0, (clientX - bounds.left) / bounds.width));
+    const target = ratio * viewerProgress.duration;
+    viewerFrame.current?.contentWindow?.postMessage({ method: "setCurrentTime", value: target }, "https://player.vimeo.com");
+    setViewerProgress((progress) => ({ ...progress, seconds: target }));
+  }, [viewerProgress.duration]);
+
+  const startSeek = (event: React.PointerEvent<HTMLDivElement>) => {
+    event.stopPropagation();
+    const bounds = event.currentTarget.getBoundingClientRect();
+    seekViewer(event.clientX, bounds);
+    const onMove = (moveEvent: PointerEvent) => seekViewer(moveEvent.clientX, bounds);
+    const onUp = () => {
+      window.removeEventListener("pointermove", onMove);
+      window.removeEventListener("pointerup", onUp);
+    };
+    window.addEventListener("pointermove", onMove);
+    window.addEventListener("pointerup", onUp);
+  };
 
   const toggleViewer = useCallback(() => {
     if (viewerPlaying) {
@@ -533,17 +608,47 @@ export default function Home() {
           onMouseMove={trackViewerCursor}
           onMouseLeave={() => setCursor((position) => ({ ...position, visible: false }))}
           onClick={() => viewerAtEdge ? close() : toggleViewer()}
+          ref={viewerRoot}
         >
           <div className="viewer-media" ref={viewerMedia}>
-            <iframe
-              ref={viewerFrame}
-              key={current.id}
-              src={`https://player.vimeo.com/video/${current.vimeoId}?${current.vimeoHash ? `h=${current.vimeoHash}&` : ""}autoplay=0&controls=0&title=0&byline=0&portrait=0&dnt=1`}
-              title={current.title}
-              allow="autoplay; fullscreen; picture-in-picture"
-              allowFullScreen
-              onLoad={requestViewerDimensions}
-            />
+            <div
+              className="viewer-video-rect"
+              style={videoRect ? { left: videoRect.left, top: videoRect.top, width: videoRect.width, height: videoRect.height } : undefined}
+            >
+              <iframe
+                ref={viewerFrame}
+                key={current.id}
+                src={`https://player.vimeo.com/video/${current.vimeoId}?${current.vimeoHash ? `h=${current.vimeoHash}&` : ""}autoplay=0&controls=0&title=0&byline=0&portrait=0&dnt=1`}
+                title={current.title}
+                allow="autoplay; fullscreen; picture-in-picture"
+                allowFullScreen
+                onLoad={requestViewerDimensions}
+              />
+              {videoRect && (
+                <>
+                  <div className="viewer-progress" onClick={(event) => event.stopPropagation()} onPointerDown={startSeek}>
+                    <div className="viewer-progress-track">
+                      <div
+                        className="viewer-progress-fill"
+                        style={{ width: `${viewerProgress.duration ? (viewerProgress.seconds / viewerProgress.duration) * 100 : 0}%` }}
+                      />
+                    </div>
+                  </div>
+                  <button
+                    className="viewer-fullscreen"
+                    type="button"
+                    onClick={toggleFullscreen}
+                    aria-label={viewerFullscreen ? "Exit fullscreen" : "Enter fullscreen"}
+                  >
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.2" strokeLinecap="round" aria-hidden="true">
+                      <path d="M3 7V3h4" /><path d="M21 7V3h-4" /><path d="M3 17v4h4" /><path d="M21 17v4h-4" />
+                      <path d="M15 9l2.3-2.3" /><path d="M17.3 8v-1.3h-1.3" />
+                      <path d="M9 15l-2.3 2.3" /><path d="M6.7 16v1.3h1.3" />
+                    </svg>
+                  </button>
+                </>
+              )}
+            </div>
           </div>
           <div className="viewer-top"><span>{current.title}</span><button className="viewer-mobile-close" onClick={(event) => { event.stopPropagation(); close(); }} aria-label="Close video">CLOSE ×</button></div>
           <button className="viewer-arrow previous" onClick={(event) => { event.stopPropagation(); move(-1); }} aria-label="Previous project">←</button>
