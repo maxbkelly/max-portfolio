@@ -210,6 +210,7 @@ export default function Home() {
   const [mobileVideoBottom, setMobileVideoBottom] = useState<number | null>(null);
   const [heroMuted, setHeroMuted] = useState(true);
   const [heroReady, setHeroReady] = useState(false);
+  const [isMobileHero, setIsMobileHero] = useState(false);
   const [heroCursor, setHeroCursor] = useState({ x: 0, y: 0 });
   const [cursor, setCursor] = useState({ x: 0, y: 0, visible: false });
   const [cursorSuppressed, setCursorSuppressed] = useState(false);
@@ -220,6 +221,10 @@ export default function Home() {
   const viewerRoot = useRef<HTMLDivElement>(null);
   const activeSection = content.sections.find((section) => section.id === category) || content.sections[0];
   const visible = activeSection?.projects || [];
+  // Only ever swaps in on a touch device with a coarse pointer (see the
+  // isMobileHero layout effect) — desktop always uses content.homepageReel,
+  // unchanged. Falls back to the main reel if no mobile-specific one is set.
+  const heroReel = isMobileHero && content.homepageReelMobile ? content.homepageReelMobile : content.homepageReel;
 
   useEffect(() => {
     const controller = new AbortController();
@@ -478,7 +483,10 @@ export default function Home() {
   // HTML. useLayoutEffect runs after hydration is already reconciled, so it
   // can't cause that mismatch, and fires before paint so there's no flash.
   useLayoutEffect(() => {
-    if (window.matchMedia("(pointer: coarse)").matches) setHeroReady(true);
+    if (window.matchMedia("(pointer: coarse)").matches) {
+      setHeroReady(true);
+      setIsMobileHero(true);
+    }
   }, []);
 
   // Browsers correctly pause backgrounded video when a tab isn't visible —
@@ -607,7 +615,7 @@ export default function Home() {
           <iframe
             ref={heroFrame}
             className="hero-video"
-            src={`https://player.vimeo.com/video/${content.homepageReel.vimeoId}?${content.homepageReel.vimeoHash ? `h=${content.homepageReel.vimeoHash}&` : ""}background=1&autoplay=1&loop=1&muted=1&autopause=0&playsinline=1&dnt=1`}
+            src={`https://player.vimeo.com/video/${heroReel.vimeoId}?${heroReel.vimeoHash ? `h=${heroReel.vimeoHash}&` : ""}background=1&autoplay=1&loop=1&muted=1&autopause=0&playsinline=1&dnt=1`}
             title="Maximilian Kelly editors reel"
             allow="autoplay; fullscreen; picture-in-picture"
             onLoad={subscribeHeroEvents}
