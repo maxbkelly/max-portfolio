@@ -230,7 +230,10 @@ export default function Home() {
   }, []);
   const move = useCallback((direction: number) => {
     setViewerPlaying(false);
-    setViewerAtEdge(false);
+    // Defaults to the windowed (zoomed-out) view on navigation rather than
+    // full-bleed — it only zooms in once the mouse actually moves away from
+    // the edge zone, instead of assuming the cursor is already centered.
+    setViewerAtEdge(true);
     // Cleared here, synchronously with the index change, rather than only in
     // the dimensions-reset effect that follows — otherwise the previous
     // video's rect (or dimensions-reset effect racing against the rect
