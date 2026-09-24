@@ -230,7 +230,10 @@ export default function Home() {
   }, []);
   const move = useCallback((direction: number) => {
     setViewerPlaying(false);
-    setViewerAtEdge(false);
+    // Defaults to the windowed (zoomed-out) view on navigation rather than
+    // full-bleed — it only zooms in once the mouse actually moves away from
+    // the edge zone, instead of assuming the cursor is already centered.
+    setViewerAtEdge(true);
     // Cleared here, synchronously with the index change, rather than only in
     // the dimensions-reset effect that follows — otherwise the previous
     // video's rect (or dimensions-reset effect racing against the rect
@@ -300,9 +303,18 @@ export default function Home() {
   // aspect ratio doesn't match the container's, so the progress bar and
   // fullscreen button (which need to hug the video's own edges, not the
   // container's) have to be positioned against the actual rendered video
-  // rectangle rather than the fixed-inset box around it. This also
-  // supplies the mobile credit/counter's bottom-edge positioning, which
-  // previously computed only the bottom coordinate inline.
+  // rectangle rather than the fixed-inset box around it.
+  //
+  // This is expressed in PERCENTAGES of .viewer-media, not pixels, and
+  // that's deliberate: zooming in/out changes .viewer-media's inset by the
+  // same 7.5vh/7.5vw on every side, which scales its width and height by
+  // the same factor and so never changes its aspect ratio — meaning the
+  // letterboxed video's position as a percentage of the container is
+  // IDENTICAL whether zoomed in or out. A percentage-based rect therefore
+  // tracks .viewer-media's own CSS transition natively, every frame, with
+  // no JS involved in the animation at all. (An earlier pixel-based
+  // version had to re-measure on a timer/transitionend and always lagged
+  // a frame behind, snapping into place instead of animating smoothly.)
   useEffect(() => {
     if (viewerIndex === null || !dimensionsKnown) return;
     const updateVideoRect = () => {
@@ -312,14 +324,14 @@ export default function Home() {
       const containerAspect = bounds.width / bounds.height;
       let rect;
       if (videoAspect > containerAspect) {
-        const height = bounds.width / videoAspect;
-        rect = { left: 0, top: (bounds.height - height) / 2, width: bounds.width, height };
+        const heightPercent = (containerAspect / videoAspect) * 100;
+        rect = { left: 0, top: (100 - heightPercent) / 2, width: 100, height: heightPercent };
       } else {
-        const width = bounds.height * videoAspect;
-        rect = { left: (bounds.width - width) / 2, top: 0, width, height: bounds.height };
+        const widthPercent = (videoAspect / containerAspect) * 100;
+        rect = { left: (100 - widthPercent) / 2, top: 0, width: widthPercent, height: 100 };
       }
       setVideoRect(rect);
-      setMobileVideoBottom(bounds.top + rect.top + rect.height);
+      setMobileVideoBottom(bounds.top + (rect.top / 100) * bounds.height + (rect.height / 100) * bounds.height);
     };
     updateVideoRect();
     window.addEventListener("resize", updateVideoRect);
@@ -391,28 +403,35 @@ export default function Home() {
     return () => window.removeEventListener("keydown", onKey);
   }, [viewerIndex, close, move, toggleViewer]);
 
+  // Deliberately horizontal-only (ignores clientY): the progress bar and
+  // fullscreen button live at the bottom of the frame, so if closing,
+  // zooming, or the credit/counter fade also reacted to vertical position,
+  // reaching down for those controls would trigger all of that at the same
+  // time — a moving target right when precision matters most.
   const trackViewerCursor = (event: React.MouseEvent<HTMLDivElement>) => {
-    const edgeX = window.innerWidth * 0.16;
-    const edgeY = window.innerHeight * 0.13;
-    let atEdge = event.clientX < edgeX || event.clientX > window.innerWidth - edgeX || event.clientY < edgeY || event.clientY > window.innerHeight - edgeY;
     const bounds = viewerMedia.current?.getBoundingClientRect();
     const videoAspect = viewerDimensions.width / viewerDimensions.height;
+    // The bottom 5% of the screen is a dead zone for this: it's where the
+    // progress bar and fullscreen button live, and without this, scrubbing
+    // to either end of the bar would still cross into the horizontal edge
+    // trigger and zoom/close the frame out from under the cursor.
+    const inControlZone = event.clientY > window.innerHeight * 0.95;
+    let atEdge = false;
 
-    if (bounds && Number.isFinite(videoAspect) && videoAspect > 0) {
+    if (!inControlZone && bounds && Number.isFinite(videoAspect) && videoAspect > 0) {
       const containerAspect = bounds.width / bounds.height;
       const innerTrigger = Math.min(48, window.innerWidth * 0.03);
-
+      // Pillarboxed video: its real left/right edges sit inside the frame,
+      // not at the frame's own edges. Otherwise (video fills the frame's
+      // full width) the video's edges are the frame's own edges.
+      let videoLeft = bounds.left;
+      let videoRight = bounds.right;
       if (videoAspect < containerAspect) {
         const videoWidth = bounds.height * videoAspect;
-        const videoLeft = bounds.left + (bounds.width - videoWidth) / 2;
-        const videoRight = videoLeft + videoWidth;
-        atEdge ||= event.clientX < videoLeft + innerTrigger || event.clientX > videoRight - innerTrigger;
-      } else if (videoAspect > containerAspect) {
-        const videoHeight = bounds.width / videoAspect;
-        const videoTop = bounds.top + (bounds.height - videoHeight) / 2;
-        const videoBottom = videoTop + videoHeight;
-        atEdge ||= event.clientY < videoTop + innerTrigger || event.clientY > videoBottom - innerTrigger;
+        videoLeft = bounds.left + (bounds.width - videoWidth) / 2;
+        videoRight = videoLeft + videoWidth;
       }
+      atEdge = event.clientX < videoLeft + innerTrigger || event.clientX > videoRight - innerTrigger;
     }
 
     setViewerAtEdge(atEdge);
@@ -613,7 +632,7 @@ export default function Home() {
           <div className="viewer-media" ref={viewerMedia}>
             <div
               className="viewer-video-rect"
-              style={videoRect ? { left: videoRect.left, top: videoRect.top, width: videoRect.width, height: videoRect.height } : undefined}
+              style={videoRect ? { left: `${videoRect.left}%`, top: `${videoRect.top}%`, width: `${videoRect.width}%`, height: `${videoRect.height}%` } : undefined}
             >
               <iframe
                 ref={viewerFrame}
