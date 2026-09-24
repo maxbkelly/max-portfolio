@@ -144,6 +144,7 @@ function VideoTile({ project, onOpen }: { project: Project; onOpen: () => void }
           src={`https://player.vimeo.com/video/${project.vimeoId}?${project.vimeoHash ? `h=${project.vimeoHash}&` : ""}autoplay=0&muted=1&loop=1&controls=0&title=0&byline=0&portrait=0&dnt=1`}
           title={`${project.title} preview`}
           allow="autoplay; fullscreen; picture-in-picture"
+          loading="lazy"
           style={coverStyle}
           onLoad={() => {
             requestDimensions();
