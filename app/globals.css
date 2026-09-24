@@ -46,10 +46,10 @@ nav button:hover::after { right: 0; }
 .tile-meta h3 { margin: 0; font-size: clamp(9px, 0.9vw, 15px); letter-spacing: -.035em; font-weight: 500; }
 .tile-meta h3.tile-meta-split { display: flex; justify-content: space-between; gap: 12px; }
 .about { padding: 120px 3vw 160px; background: var(--ink); color: var(--paper); }
-.about-layout { display: flex; gap: 5vw; align-items: flex-start; margin-top: 60px; }
+.about-layout { display: flex; gap: 5vw; align-items: center; margin-top: 110px; }
 .about-headshot { width: clamp(240px, 32vw, 460px); aspect-ratio: 1; object-fit: cover; background: var(--muted); flex-shrink: 0; }
 .about-copy { flex: 1; max-width: 980px; }
-.about-paragraph { font-family: Georgia, serif; font-style: italic; font-size: clamp(18px, 1.65vw, 25px); font-weight: 300; line-height: 1.5; letter-spacing: -.01em; margin: 0 0 26px; }
+.about-paragraph { font-family: "Space Grotesk", sans-serif; font-size: clamp(16px, 1.4vw, 20px); font-weight: 400; line-height: 1.6; letter-spacing: -.005em; margin: 0 0 26px; }
 .about-paragraph:last-child { margin-bottom: 0; }
 .viewer { position: fixed; z-index: 100; inset: 0; overflow: hidden; background: #050505; cursor: pointer; animation: reveal .55s cubic-bezier(.22,.8,.2,1); }
 .viewer.at-edge { cursor: default; }
