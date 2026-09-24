@@ -406,20 +406,24 @@ export default function Home() {
   // reaching down for those controls would trigger all of that at the same
   // time — a moving target right when precision matters most.
   const trackViewerCursor = (event: React.MouseEvent<HTMLDivElement>) => {
-    const edgeX = window.innerWidth * 0.16;
-    let atEdge = event.clientX < edgeX || event.clientX > window.innerWidth - edgeX;
     const bounds = viewerMedia.current?.getBoundingClientRect();
     const videoAspect = viewerDimensions.width / viewerDimensions.height;
+    let atEdge = false;
 
     if (bounds && Number.isFinite(videoAspect) && videoAspect > 0) {
       const containerAspect = bounds.width / bounds.height;
+      const innerTrigger = Math.min(48, window.innerWidth * 0.03);
+      // Pillarboxed video: its real left/right edges sit inside the frame,
+      // not at the frame's own edges. Otherwise (video fills the frame's
+      // full width) the video's edges are the frame's own edges.
+      let videoLeft = bounds.left;
+      let videoRight = bounds.right;
       if (videoAspect < containerAspect) {
-        const innerTrigger = Math.min(48, window.innerWidth * 0.03);
         const videoWidth = bounds.height * videoAspect;
-        const videoLeft = bounds.left + (bounds.width - videoWidth) / 2;
-        const videoRight = videoLeft + videoWidth;
-        atEdge ||= event.clientX < videoLeft + innerTrigger || event.clientX > videoRight - innerTrigger;
+        videoLeft = bounds.left + (bounds.width - videoWidth) / 2;
+        videoRight = videoLeft + videoWidth;
       }
+      atEdge = event.clientX < videoLeft + innerTrigger || event.clientX > videoRight - innerTrigger;
     }
 
     setViewerAtEdge(atEdge);
