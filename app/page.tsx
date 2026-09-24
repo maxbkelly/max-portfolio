@@ -202,11 +202,9 @@ export default function Home() {
   const [mobileVideoBottom, setMobileVideoBottom] = useState<number | null>(null);
   const [heroMuted, setHeroMuted] = useState(true);
   const [heroReady, setHeroReady] = useState(false);
-  const [heroSourceReady, setHeroSourceReady] = useState(false);
   const [heroCursor, setHeroCursor] = useState({ x: 0, y: 0 });
   const [cursor, setCursor] = useState({ x: 0, y: 0, visible: false });
   const [cursorSuppressed, setCursorSuppressed] = useState(false);
-  const heroIsMobileRef = useRef(false);
   const heroFrame = useRef<HTMLIFrameElement>(null);
   const heroPlaceholder = useRef<HTMLVideoElement>(null);
   const viewerFrame = useRef<HTMLIFrameElement>(null);
@@ -223,15 +221,7 @@ export default function Home() {
         setCategory((current) => nextContent.sections.some((section) => section.id === current) ? current : nextContent.sections[0].id);
       })
       .catch(() => { /* Keep the built-in content if Sanity is unavailable. */ })
-      .finally(() => {
-        setContentReady(true);
-        // On mobile the hero iframe waits for this before its first mount
-        // (see the layout effect below) so it's born with its final URL and
-        // never has its src swapped after the fact — repeated real-device
-        // testing showed that swap, not the mobile-specific reel itself,
-        // was what made the reel unreliably freeze.
-        if (heroIsMobileRef.current) setHeroSourceReady(true);
-      });
+      .finally(() => setContentReady(true));
     return () => controller.abort();
   }, []);
 
@@ -468,16 +458,7 @@ export default function Home() {
   // HTML. useLayoutEffect runs after hydration is already reconciled, so it
   // can't cause that mismatch, and fires before paint so there's no flash.
   useLayoutEffect(() => {
-    const isMobile = window.matchMedia("(pointer: coarse)").matches;
-    heroIsMobileRef.current = isMobile;
-    if (isMobile) {
-      setHeroReady(true);
-    } else {
-      // Desktop mounts immediately with whatever content is available yet
-      // (fallback, then swapped once Sanity resolves) — this single swap
-      // has always been reliable, so it's left exactly as it was.
-      setHeroSourceReady(true);
-    }
+    if (window.matchMedia("(pointer: coarse)").matches) setHeroReady(true);
   }, []);
 
   // Browsers correctly pause backgrounded video when a tab isn't visible —
@@ -593,19 +574,14 @@ export default function Home() {
             onClick={(event) => { event.currentTarget.play().catch(() => {}); }}
           />
         )}
-        {heroSourceReady && (() => {
-          const heroVimeo = heroIsMobileRef.current && content.homepageReelMobile ? content.homepageReelMobile : content.homepageReel;
-          return (
-            <iframe
-              ref={heroFrame}
-              className="hero-video"
-              src={`https://player.vimeo.com/video/${heroVimeo.vimeoId}?${heroVimeo.vimeoHash ? `h=${heroVimeo.vimeoHash}&` : ""}background=1&autoplay=1&loop=1&muted=1&autopause=0&playsinline=1&dnt=1`}
-              title="Maximilian Kelly editors reel"
-              allow="autoplay; fullscreen; picture-in-picture"
-              onLoad={subscribeHeroEvents}
-            />
-          );
-        })()}
+        <iframe
+          ref={heroFrame}
+          className="hero-video"
+          src={`https://player.vimeo.com/video/${content.homepageReel.vimeoId}?${content.homepageReel.vimeoHash ? `h=${content.homepageReel.vimeoHash}&` : ""}background=1&autoplay=1&loop=1&muted=1&autopause=0&playsinline=1&dnt=1`}
+          title="Maximilian Kelly editors reel"
+          allow="autoplay; fullscreen; picture-in-picture"
+          onLoad={subscribeHeroEvents}
+        />
         <button
           className="hero-sound hero-sound-desktop"
           type="button"
