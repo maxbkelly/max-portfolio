@@ -3,6 +3,18 @@
 import { useCallback, useEffect, useLayoutEffect, useRef, useState } from "react";
 import { fallbackContent, loadCmsContent, type Project } from "./data";
 
+// Hosted on Sanity's file CDN rather than as a Workers static asset: Workers
+// static assets ignore Range requests (verified: a Range request still gets
+// back a plain 200, no Accept-Ranges), which is why looping this video used
+// to cause a visible stall — the browser can't cheaply seek back to the
+// start, so it has to re-fetch and re-decode the whole file, showing the
+// hero's bare background color for a beat. Sanity's CDN returns a proper 206
+// for the same request, so looping is instant. This is the same infra asset
+// as before (a short muted loop), just moved off the Workers domain — not a
+// Sanity Studio content field, since it needs to render before the CMS
+// fetch resolves.
+const HERO_PLACEHOLDER_URL = "https://cdn.sanity.io/files/j7kkjji4/production/b0bc9fd0f24fb38534fdd8bf6c3fe2aac44ce607.mp4";
+
 let measureProbe: HTMLSpanElement | null = null;
 // Canvas measureText ignores letter-spacing (and can resolve condensed font
 // stacks differently than the DOM), so measure with a real hidden element
@@ -594,7 +606,7 @@ export default function Home() {
           <video
             ref={heroPlaceholder}
             className="hero-video hero-placeholder"
-            src="/hero-placeholder.mp4"
+            src={HERO_PLACEHOLDER_URL}
             muted
             loop
             playsInline
