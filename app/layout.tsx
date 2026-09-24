@@ -10,15 +10,18 @@ export default function RootLayout({ children }: Readonly<{ children: React.Reac
   return (
     <html lang="en">
       <head>
-        <link rel="preconnect" href="https://fonts.googleapis.com" />
-        <link rel="preconnect" href="https://fonts.gstatic.com" crossOrigin="anonymous" />
-        <link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;500&display=swap" rel="stylesheet" />
-        {/* Lets the browser start the connection to Vimeo's domains before
-            the hero iframe itself requests them, shaving connection setup
-            time off the reel's start — most noticeable on mobile data. */}
+        {/* Only player.vimeo.com is on the hero's critical path (the iframe
+            document and player.js). i.vimeocdn.com (poster images) and
+            f.vimeocdn.com (player UI chrome) are both preconnects the
+            hero's background=1 embed likely never even uses — it has no
+            poster state and effectively no visible UI — so they were just
+            extra handshakes competing for the same limited connection
+            capacity on a slow mobile-data link. The Google Fonts stylesheet
+            for the About section (used only below the fold) is now
+            injected client-side after mount instead of living here, so it
+            doesn't compete with the hero at all during initial load — see
+            the effect in page.tsx. */}
         <link rel="preconnect" href="https://player.vimeo.com" />
-        <link rel="preconnect" href="https://i.vimeocdn.com" />
-        <link rel="preconnect" href="https://f.vimeocdn.com" />
       </head>
       <body>{children}</body>
     </html>
