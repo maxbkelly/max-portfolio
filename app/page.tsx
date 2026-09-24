@@ -139,22 +139,29 @@ function VideoTile({ project, onOpen }: { project: Project; onOpen: () => void }
       onMouseMove={trackCursor}
     >
       <button className="tile-hit" onClick={onOpen} aria-label={`Play ${project.title}`}>
-        <iframe
-          ref={frame}
-          src={`https://player.vimeo.com/video/${project.vimeoId}?${project.vimeoHash ? `h=${project.vimeoHash}&` : ""}autoplay=0&muted=1&loop=1&controls=0&title=0&byline=0&portrait=0&dnt=1`}
-          title={`${project.title} preview`}
-          allow="autoplay; fullscreen; picture-in-picture"
-          loading="lazy"
-          style={coverStyle}
-          onLoad={() => {
-            requestDimensions();
-            stopDimensionPoll();
-            dimensionPoll.current = setInterval(requestDimensions, 250);
-            setTimeout(stopDimensionPoll, 4000);
-          }}
-        />
-        {project.thumbnailUrl && (
+        {project.thumbnailUrl ? (
+          // No Vimeo iframe at all here — it would only ever exist to
+          // supply the aspect ratio for coverStyle below, but the thumbnail
+          // already covers the tile on its own via CSS object-fit. Loading
+          // a full Vimeo player per tile just to sit permanently hidden
+          // behind the thumbnail was pure wasted bandwidth; the real video
+          // only needs to load once someone actually opens the viewer.
           <img src={project.thumbnailUrl} alt="" className="tile-thumbnail" />
+        ) : (
+          <iframe
+            ref={frame}
+            src={`https://player.vimeo.com/video/${project.vimeoId}?${project.vimeoHash ? `h=${project.vimeoHash}&` : ""}autoplay=0&muted=1&loop=1&controls=0&title=0&byline=0&portrait=0&dnt=1`}
+            title={`${project.title} preview`}
+            allow="autoplay; fullscreen; picture-in-picture"
+            loading="lazy"
+            style={coverStyle}
+            onLoad={() => {
+              requestDimensions();
+              stopDimensionPoll();
+              dimensionPoll.current = setInterval(requestDimensions, 250);
+              setTimeout(stopDimensionPoll, 4000);
+            }}
+          />
         )}
         {project.hoverPreviewUrl && (
           <video
