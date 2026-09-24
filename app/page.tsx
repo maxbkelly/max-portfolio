@@ -204,6 +204,7 @@ export default function Home() {
   const [heroReady, setHeroReady] = useState(false);
   const [heroCursor, setHeroCursor] = useState({ x: 0, y: 0 });
   const [cursor, setCursor] = useState({ x: 0, y: 0, visible: false });
+  const [cursorSuppressed, setCursorSuppressed] = useState(false);
   const heroFrame = useRef<HTMLIFrameElement>(null);
   const heroPlaceholder = useRef<HTMLVideoElement>(null);
   const viewerFrame = useRef<HTMLIFrameElement>(null);
@@ -657,6 +658,8 @@ export default function Home() {
                     className="viewer-fullscreen"
                     type="button"
                     onClick={toggleFullscreen}
+                    onMouseEnter={() => setCursorSuppressed(true)}
+                    onMouseLeave={() => setCursorSuppressed(false)}
                     aria-label={viewerFullscreen ? "Exit fullscreen" : "Enter fullscreen"}
                   >
                     <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.2" strokeLinecap="round" aria-hidden="true">
@@ -670,14 +673,26 @@ export default function Home() {
             </div>
           </div>
           <div className="viewer-top"><span>{current.title}</span><button className="viewer-mobile-close" onClick={(event) => { event.stopPropagation(); close(); }} aria-label="Close video">CLOSE ×</button></div>
-          <button className="viewer-arrow previous" onClick={(event) => { event.stopPropagation(); move(-1); }} aria-label="Previous project">←</button>
-          <button className="viewer-arrow next" onClick={(event) => { event.stopPropagation(); move(1); }} aria-label="Next project">→</button>
+          <button
+            className="viewer-arrow previous"
+            onClick={(event) => { event.stopPropagation(); move(-1); }}
+            onMouseEnter={() => setCursorSuppressed(true)}
+            onMouseLeave={() => setCursorSuppressed(false)}
+            aria-label="Previous project"
+          >←</button>
+          <button
+            className="viewer-arrow next"
+            onClick={(event) => { event.stopPropagation(); move(1); }}
+            onMouseEnter={() => setCursorSuppressed(true)}
+            onMouseLeave={() => setCursorSuppressed(false)}
+            aria-label="Next project"
+          >→</button>
           {current.credits?.length ? (
             <div className={`viewer-credit ${viewerAtEdge ? "" : "faded"}`}>{current.credits.map((credit) => `${credit.label} by ${credit.value}`).join(" · ")}</div>
           ) : null}
           <div className={`viewer-count ${viewerAtEdge ? "" : "faded"}`}>{String(viewerIndex! + 1).padStart(2, "0")} / {String(visible.length).padStart(2, "0")}</div>
           <span
-            className={`viewer-cursor ${cursor.visible ? "visible" : ""}`}
+            className={`viewer-cursor ${cursor.visible && !cursorSuppressed ? "visible" : ""}`}
             style={{ transform: `translate3d(${cursor.x}px, ${cursor.y}px, 0) translateY(-50%)` }}
             aria-hidden="true"
           >
