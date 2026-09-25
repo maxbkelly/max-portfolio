@@ -128,7 +128,7 @@ nav button:hover::after { right: 0; }
    bottom bar, progress/fullscreen in their own row under the video, credit
    below that, prev/count/next in the thumb zone, swipe between projects.
    Landscape phones and desktop keep the layout above. */
-.viewer-mobile-bar, .viewer-peek { display: none; }
+.viewer-mobile-bar, .viewer-peek, .viewer-poster { display: none; }
 @keyframes viewer-slide-next { from { transform: translateX(100%); } }
 @keyframes viewer-slide-prev { from { transform: translateX(-100%); } }
 @media (pointer: coarse) and (orientation: portrait) {
@@ -144,12 +144,17 @@ nav button:hover::after { right: 0; }
   .viewer-mobile-bar { display: flex; position: absolute; z-index: 3; left: 0; right: 0; bottom: 0; height: 64px; padding: 0 16px 10px; align-items: center; justify-content: space-between; border-top: 1px solid #242424; font-size: 11px; letter-spacing: .12em; }
   .viewer-mobile-bar button { padding: 12px 0; letter-spacing: inherit; }
   .viewer-mobile-bar span { color: var(--muted); }
-  .viewer-peek { display: block; position: absolute; top: 50%; width: 100%; transform: translateY(-50%); pointer-events: none; }
+  .viewer-peek { display: block; position: absolute; top: 0; bottom: 0; width: 100%; pointer-events: none; }
   .viewer-peek.next { left: calc(100% + 16px); }
   .viewer-peek.prev { right: calc(100% + 16px); }
-  .viewer-peek-frame { width: 100%; aspect-ratio: 16 / 9; overflow: hidden; }
+  .viewer-peek-frame { position: absolute; overflow: hidden; background: #111; }
   .viewer-peek-frame img { width: 100%; height: 100%; object-fit: cover; display: block; }
-  .viewer-peek span { display: block; margin-top: 14px; padding: 0 16px; font-size: 11px; letter-spacing: .12em; }
+  .viewer-peek span { position: absolute; left: 0; right: 0; padding: 0 16px; font-size: 11px; letter-spacing: .12em; }
+  /* Vimeo's own poster frame holds the spot until its player is ready, so
+     there's no black gap after swiping to a project. */
+  .viewer-poster { display: block; position: absolute; inset: 0; width: 100%; height: 100%; object-fit: contain; pointer-events: none; }
+  .viewer-video-rect iframe { position: relative; }
+  .viewer:not(.frame-ready) .viewer-video-rect iframe { opacity: 0; }
   .viewer:fullscreen .viewer-media { inset: 0; }
   .viewer:fullscreen .viewer-mobile-bar { display: none; }
   .viewer:fullscreen .viewer-progress { top: auto; bottom: 16px; }
