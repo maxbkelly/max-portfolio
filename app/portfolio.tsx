@@ -1,7 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useLayoutEffect, useRef, useState } from "react";
-import { fallbackContent, loadCmsContent, type PortfolioContent, type Project } from "./data";
+import { fallbackContent, loadCmsContent, streamHlsUrl, streamThumbnailUrl, type PortfolioContent, type Project } from "./data";
 
 // Where a video of the given aspect ratio sits when letterboxed/pillarboxed
 // inside a box, in percentages of that box.
@@ -236,6 +236,7 @@ export default function Portfolio({ initialContent, initialIsMobile }: { initial
   const [animationMinDone, setAnimationMinDone] = useState(false);
   const [isMobileHero, setIsMobileHero] = useState(initialIsMobile);
   const [heroFileFailed, setHeroFileFailed] = useState(false);
+  const [streamFailedFor, setStreamFailedFor] = useState<string | null>(null);
   const [heroCursor, setHeroCursor] = useState({ x: 0, y: 0 });
   const [cursor, setCursor] = useState({ x: 0, y: 0, visible: false });
   const [cursorSuppressed, setCursorSuppressed] = useState(false);
@@ -244,6 +245,7 @@ export default function Portfolio({ initialContent, initialIsMobile }: { initial
   const heroFile = useRef<HTMLVideoElement>(null);
   const reelHeld = useRef(false);
   const viewerFrame = useRef<HTMLIFrameElement>(null);
+  const viewerVideo = useRef<HTMLVideoElement>(null);
   const viewerMedia = useRef<HTMLDivElement>(null);
   const viewerRoot = useRef<HTMLDivElement>(null);
   const fullscreenRetryOnPlay = useRef(false);
@@ -327,7 +329,16 @@ export default function Portfolio({ initialContent, initialIsMobile }: { initial
     move(direction);
   }, [move]);
 
+  // Phones with a Stream video play it in a native <video> on this page, so
+  // the tap that calls this is a real tap for the video — sound and native
+  // full screen work. Everything else talks to the Vimeo iframe.
   const sendToViewer = useCallback((method: "play" | "pause") => {
+    const video = viewerVideo.current;
+    if (video) {
+      if (method === "play") video.play().catch(() => {});
+      else video.pause();
+      return;
+    }
     viewerFrame.current?.contentWindow?.postMessage({ method }, "https://player.vimeo.com");
   }, []);
 
@@ -480,8 +491,20 @@ export default function Portfolio({ initialContent, initialIsMobile }: { initial
         .catch(() => {});
       return;
     }
-    // iPhone Safari can't make page elements full screen, but Vimeo's player
-    // can open the native iPhone player. That's refused while the video is
+    // iPhone Safari can't make page elements full screen. A native <video>
+    // (Stream) can open the iPhone player directly from this tap; start it
+    // too, since iOS won't before the video has loaded. If it isn't ready
+    // yet, a second press works once it's playing.
+    const video = viewerVideo.current as (HTMLVideoElement & { webkitEnterFullscreen?: () => void }) | null;
+    if (video?.webkitEnterFullscreen) {
+      if (video.paused) {
+        video.play().catch(() => {});
+        setViewerPlaying(true);
+      }
+      try { video.webkitEnterFullscreen(); } catch { /* not loaded yet */ }
+      return;
+    }
+    // Vimeo's player can open the native iPhone player too. That's refused while the video is
     // still paused, so start it too, and ask again once it's playing (see
     // the "play" handler above). If it still doesn't open, a second press
     // will, since the video is playing by then.
@@ -552,7 +575,8 @@ export default function Portfolio({ initialContent, initialIsMobile }: { initial
     if (!viewerProgress.duration) return;
     const ratio = Math.min(1, Math.max(0, (clientX - bounds.left) / bounds.width));
     const target = ratio * viewerProgress.duration;
-    viewerFrame.current?.contentWindow?.postMessage({ method: "setCurrentTime", value: target }, "https://player.vimeo.com");
+    if (viewerVideo.current) viewerVideo.current.currentTime = target;
+    else viewerFrame.current?.contentWindow?.postMessage({ method: "setCurrentTime", value: target }, "https://player.vimeo.com");
     setViewerProgress((progress) => ({ ...progress, seconds: target }));
   }, [viewerProgress.duration]);
 
@@ -639,6 +663,15 @@ export default function Portfolio({ initialContent, initialIsMobile }: { initial
   };
 
   const current = viewerIndex === null ? null : visible[viewerIndex];
+  // Phones play a project's Stream video when it has one (falling back to
+  // Vimeo if it fails); desktop always uses Vimeo.
+  const currentStreamId = current && isMobileHero && current.streamVideoId && streamFailedFor !== current.id ? current.streamVideoId : undefined;
+  // The frame shown before a project plays and in the swipe preview: the
+  // chosen Stream moment if set, otherwise Vimeo's own poster.
+  const posterFor = (project: Project) =>
+    project.streamVideoId && typeof project.streamThumbnailTime === "number"
+      ? streamThumbnailUrl(project.streamVideoId, project.streamThumbnailTime)
+      : vimeoThumbs[project.vimeoId]?.url;
 
   // The server guesses phone vs. desktop from the user agent so the right
   // hero is already in the HTML; this corrects the rare wrong guess (e.g.
@@ -961,7 +994,7 @@ export default function Portfolio({ initialContent, initialIsMobile }: { initial
               return (
                 <div className={`viewer-peek ${side}`} key={side} aria-hidden="true">
                   <div className="viewer-peek-frame" style={{ left: `${frame.left}%`, top: `${frame.top}%`, width: `${frame.width}%`, height: `${frame.height}%` }}>
-                    {thumb && <img src={thumb.url} alt="" />}
+                    {posterFor(neighbour) && <img src={posterFor(neighbour)} alt="" />}
                   </div>
                   <span style={{ top: `calc(${frame.top + frame.height}% + 14px)` }}>{neighbour.title}</span>
                 </div>
@@ -971,18 +1004,40 @@ export default function Portfolio({ initialContent, initialIsMobile }: { initial
               className="viewer-video-rect"
               style={videoRect ? { left: `${videoRect.left}%`, top: `${videoRect.top}%`, width: `${videoRect.width}%`, height: `${videoRect.height}%` } : undefined}
             >
-              {isMobileHero && vimeoThumbs[current.vimeoId] && (
-                <img className="viewer-poster" src={vimeoThumbs[current.vimeoId].url} alt="" aria-hidden="true" />
+              {isMobileHero && posterFor(current) && (
+                <img className="viewer-poster" src={posterFor(current)} alt="" aria-hidden="true" />
               )}
-              <iframe
-                ref={viewerFrame}
-                key={current.id}
-                src={`https://player.vimeo.com/video/${current.vimeoId}?${current.vimeoHash ? `h=${current.vimeoHash}&` : ""}autoplay=0&controls=0&title=0&byline=0&portrait=0&dnt=1`}
-                title={current.title}
-                allow="autoplay; fullscreen; picture-in-picture"
-                allowFullScreen
-                onLoad={requestViewerDimensions}
-              />
+              {currentStreamId ? (
+                <video
+                  ref={viewerVideo}
+                  key={current.id}
+                  src={streamHlsUrl(currentStreamId)}
+                  poster={posterFor(current)}
+                  playsInline
+                  preload="metadata"
+                  aria-label={current.title}
+                  onLoadedMetadata={(event) => {
+                    const video = event.currentTarget;
+                    setViewerDimensions({ width: video.videoWidth, height: video.videoHeight });
+                    setDimensionsKnown(true);
+                    setViewerFrameReady(true);
+                  }}
+                  onTimeUpdate={(event) => setViewerProgress({ seconds: event.currentTarget.currentTime, duration: event.currentTarget.duration || 0 })}
+                  onPlay={() => setViewerPlaying(true)}
+                  onPause={() => setViewerPlaying(false)}
+                  onError={() => setStreamFailedFor(current.id)}
+                />
+              ) : (
+                <iframe
+                  ref={viewerFrame}
+                  key={current.id}
+                  src={`https://player.vimeo.com/video/${current.vimeoId}?${current.vimeoHash ? `h=${current.vimeoHash}&` : ""}autoplay=0&controls=0&title=0&byline=0&portrait=0&dnt=1`}
+                  title={current.title}
+                  allow="autoplay; fullscreen; picture-in-picture"
+                  allowFullScreen
+                  onLoad={requestViewerDimensions}
+                />
+              )}
               {videoRect && (
                 <>
                   <div className="viewer-progress" onClick={(event) => event.stopPropagation()} onPointerDown={startSeek}>

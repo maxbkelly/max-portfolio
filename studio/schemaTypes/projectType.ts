@@ -32,6 +32,20 @@ export const projectType = defineType({
       validation: (Rule) => Rule.required().uri({scheme: ["http", "https"]}),
     }),
     defineField({
+      name: "streamVideoId",
+      title: "Phone video — Cloudflare Stream ID",
+      description: "Optional. The video's ID from Cloudflare Stream (Images & Stream → Hosted videos). Phones play this instead of Vimeo, so sound works on the first tap and fullscreen opens the native player. Leave blank to use Vimeo on phones too. Desktop always uses Vimeo.",
+      type: "string",
+      validation: (Rule) => Rule.regex(/^[a-f0-9]{32}$/, {name: "Stream video ID"}),
+    }),
+    defineField({
+      name: "streamThumbnailTime",
+      title: "Phone poster frame (seconds)",
+      description: "Optional. Which moment of the Stream video to show before it plays — e.g. 12 for 12 seconds in. Leave blank to use the Vimeo thumbnail.",
+      type: "number",
+      validation: (Rule) => Rule.min(0),
+    }),
+    defineField({
       name: "thumbnail",
       title: "Custom thumbnail",
       description: "Optional. Shown in the grid instead of the video's own frame. Leave blank to keep showing the video frame.",
