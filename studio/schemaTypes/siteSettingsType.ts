@@ -18,6 +18,13 @@ export const siteSettingsType = defineType({
       validation: (Rule) => Rule.required().uri({scheme: ["http", "https"]}),
     }),
     defineField({
+      name: "homepageReelVideo",
+      title: "Homepage reel — fast video file (desktop)",
+      description: "Optional. A 16:9 MP4 (1920×1080, around 25 MB) that desktop plays directly instead of loading the Vimeo reel above, so it starts much faster. Leave blank to use the Vimeo reel. Does not affect phones.",
+      type: "file",
+      options: {accept: "video/mp4"},
+    }),
+    defineField({
       name: "homepageReelMobileUrl",
       title: "Mobile homepage reel",
       description: "Optional. A 9:16 (vertical) version shown on phones instead of the reel above. Leave blank to use the same reel on mobile.",

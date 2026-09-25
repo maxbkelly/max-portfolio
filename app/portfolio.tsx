@@ -234,10 +234,12 @@ export default function Portfolio({ initialContent, initialIsMobile }: { initial
   // isMobileHero layout effect) — desktop always uses content.homepageReel,
   // unchanged. Falls back to the main reel if no mobile-specific one is set.
   const heroReel = isMobileHero && content.homepageReelMobile ? content.homepageReelMobile : content.homepageReel;
-  // Phones play the CMS video file directly when one is set, skipping
-  // Vimeo's iframe/player/config round trips entirely. Desktop never uses
-  // it. Falls back to the Vimeo iframe if the file is missing or fails.
-  const heroFileUrl = isMobileHero && !heroFileFailed ? content.homepageReelMobileVideoUrl : undefined;
+  // Plays the CMS video file for this device directly when one is set,
+  // skipping Vimeo's iframe/player/config round trips entirely. Falls back
+  // to the Vimeo iframe if the file is missing or fails.
+  const heroFileUrl = heroFileFailed
+    ? undefined
+    : isMobileHero ? content.homepageReelMobileVideoUrl : content.homepageReelVideoUrl;
   // On phones the loading animation only fronts the native reel file; the
   // Vimeo fallback there keeps showing the reel directly, as before.
   const loadingAnimationUrl = isMobileHero
@@ -585,7 +587,7 @@ export default function Portfolio({ initialContent, initialIsMobile }: { initial
   // ignores messages sent before it's ready), with a backstop in case onLoad
   // never arrives.
   useEffect(() => {
-    if (!contentReady || isMobileHero || heroReady) return;
+    if (!contentReady || isMobileHero || heroFileUrl || heroReady) return;
     const poll = window.setInterval(() => {
       heroFrame.current?.contentWindow?.postMessage({ method: "getPaused" }, "https://player.vimeo.com");
     }, 250);
@@ -594,7 +596,7 @@ export default function Portfolio({ initialContent, initialIsMobile }: { initial
       window.clearInterval(poll);
       window.clearTimeout(backstop);
     };
-  }, [contentReady, isMobileHero, heroReady]);
+  }, [contentReady, isMobileHero, heroFileUrl, heroReady]);
 
   // Same approach as the placeholder: no autoPlay attribute (avoids the
   // "blocked, tap to retry" button on some phones), muted attribute set by
@@ -669,6 +671,18 @@ export default function Portfolio({ initialContent, initialIsMobile }: { initial
     );
     setHeroMuted(nextMuted);
   };
+
+  // Opening a project mutes the homepage reel so its sound doesn't compete
+  // with the project's. It stays muted after closing; the SOUND button
+  // shows that, and turns it back on.
+  const viewerOpen = viewerIndex !== null;
+  useEffect(() => {
+    if (!viewerOpen) return;
+    if (heroFile.current) heroFile.current.muted = true;
+    heroFrame.current?.contentWindow?.postMessage({ method: "setMuted", value: true }, "https://player.vimeo.com");
+    heroFrame.current?.contentWindow?.postMessage({ method: "setVolume", value: 0 }, "https://player.vimeo.com");
+    setHeroMuted(true);
+  }, [viewerOpen]);
 
   return (
     <main>
