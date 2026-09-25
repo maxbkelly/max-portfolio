@@ -211,6 +211,10 @@ export default function Portfolio({ initialContent, initialIsMobile }: { initial
   const [videoRect, setVideoRect] = useState<{ top: number; left: number; width: number; height: number } | null>(null);
   const [dimensionsKnown, setDimensionsKnown] = useState(false);
   const [viewerFullscreen, setViewerFullscreen] = useState(false);
+  const [viewerImmersive, setViewerImmersive] = useState(false);
+  const [dragX, setDragX] = useState<number | null>(null);
+  const [dragSettling, setDragSettling] = useState(false);
+  const [viewerSlide, setViewerSlide] = useState<"next" | "prev" | null>(null);
   const [mobileVideoBottom, setMobileVideoBottom] = useState<number | null>(null);
   const [heroMuted, setHeroMuted] = useState(true);
   const [heroReady, setHeroReady] = useState(false);
@@ -228,6 +232,9 @@ export default function Portfolio({ initialContent, initialIsMobile }: { initial
   const viewerFrame = useRef<HTMLIFrameElement>(null);
   const viewerMedia = useRef<HTMLDivElement>(null);
   const viewerRoot = useRef<HTMLDivElement>(null);
+  const nativeFullscreenPending = useRef(false);
+  const swipeStart = useRef<{ x: number; y: number; t: number; horizontal: boolean } | null>(null);
+  const lastSwipeAt = useRef(0);
   const activeSection = content.sections.find((section) => section.id === category) || content.sections[0];
   const visible = activeSection?.projects || [];
   // Only ever swaps in on a touch device with a coarse pointer (see the
@@ -279,13 +286,16 @@ export default function Portfolio({ initialContent, initialIsMobile }: { initial
   const close = useCallback(() => {
     setViewerIndex(null);
     setViewerPlaying(false);
+    setViewerImmersive(false);
   }, []);
   const move = useCallback((direction: number) => {
     setViewerPlaying(false);
     // Defaults to the windowed (zoomed-out) view on navigation rather than
     // full-bleed — it only zooms in once the mouse actually moves away from
     // the edge zone, instead of assuming the cursor is already centered.
-    setViewerAtEdge(true);
+    // Not on touch: there's no cursor to move away, so the frame stayed
+    // shrunk and the next tap closed the viewer instead of playing.
+    setViewerAtEdge(!isMobileHero);
     // Cleared here, synchronously with the index change, rather than only in
     // the dimensions-reset effect that follows — otherwise the previous
     // video's rect (or dimensions-reset effect racing against the rect
@@ -295,7 +305,14 @@ export default function Portfolio({ initialContent, initialIsMobile }: { initial
     setVideoRect(null);
     setDimensionsKnown(false);
     setViewerIndex((current) => current === null ? null : (current + direction + visible.length) % visible.length);
-  }, [visible.length]);
+  }, [visible.length, isMobileHero]);
+
+  // Phone navigation (bottom bar and swipe): same as move(), plus the new
+  // project slides in from the side it came from.
+  const goTo = useCallback((direction: number) => {
+    setViewerSlide(direction > 0 ? "next" : "prev");
+    move(direction);
+  }, [move]);
 
   const sendToViewer = useCallback((method: "play" | "pause") => {
     viewerFrame.current?.contentWindow?.postMessage({ method }, "https://player.vimeo.com");
@@ -323,6 +340,12 @@ export default function Portfolio({ initialContent, initialIsMobile }: { initial
         if (data?.event === "ready") {
           requestViewerDimensions();
           viewerFrame.current?.contentWindow?.postMessage({ method: "addEventListener", value: "timeupdate" }, "https://player.vimeo.com");
+          viewerFrame.current?.contentWindow?.postMessage({ method: "addEventListener", value: "fullscreenchange" }, "https://player.vimeo.com");
+        }
+        if (data?.event === "fullscreenchange") nativeFullscreenPending.current = false;
+        if (data?.event === "error" && data.data?.method === "requestFullscreen" && nativeFullscreenPending.current) {
+          nativeFullscreenPending.current = false;
+          setViewerImmersive(true);
         }
         if (data?.method === "getVideoWidth" && Number.isFinite(data.value)) {
           setViewerDimensions((dimensions) => ({ ...dimensions, width: data.value }));
@@ -370,9 +393,12 @@ export default function Portfolio({ initialContent, initialIsMobile }: { initial
   useEffect(() => {
     if (viewerIndex === null || !dimensionsKnown) return;
     const updateVideoRect = () => {
-      const bounds = viewerMedia.current?.getBoundingClientRect();
+      const media = viewerMedia.current;
       const videoAspect = viewerDimensions.width / viewerDimensions.height;
-      if (!bounds || !Number.isFinite(videoAspect) || videoAspect <= 0) return;
+      if (!media || !Number.isFinite(videoAspect) || videoAspect <= 0) return;
+      // offsetWidth/Height are the untransformed layout size; the bounding
+      // rect would be swapped while the phone full-screen view rotates it.
+      const bounds = { top: media.getBoundingClientRect().top, width: media.offsetWidth, height: media.offsetHeight };
       const containerAspect = bounds.width / bounds.height;
       let rect;
       if (videoAspect > containerAspect) {
@@ -392,22 +418,108 @@ export default function Portfolio({ initialContent, initialIsMobile }: { initial
       window.removeEventListener("resize", updateVideoRect);
       window.removeEventListener("orientationchange", updateVideoRect);
     };
-  }, [viewerIndex, viewerDimensions, dimensionsKnown]);
+  }, [viewerIndex, viewerDimensions, dimensionsKnown, viewerImmersive]);
 
   useEffect(() => {
-    const onFullscreenChange = () => setViewerFullscreen(document.fullscreenElement === viewerRoot.current);
+    const onFullscreenChange = () => {
+      const isFullscreen = document.fullscreenElement === viewerRoot.current;
+      setViewerFullscreen(isFullscreen);
+      if (!isFullscreen) screen.orientation?.unlock?.();
+    };
     document.addEventListener("fullscreenchange", onFullscreenChange);
     return () => document.removeEventListener("fullscreenchange", onFullscreenChange);
   }, []);
 
   const toggleFullscreen = useCallback((event: React.MouseEvent) => {
     event.stopPropagation();
+    if (viewerImmersive) {
+      setViewerImmersive(false);
+      return;
+    }
     if (document.fullscreenElement) {
       document.exitFullscreen();
-    } else {
-      viewerRoot.current?.requestFullscreen();
+      return;
     }
-  }, []);
+    const root = viewerRoot.current;
+    if (root && document.fullscreenEnabled && typeof root.requestFullscreen === "function") {
+      root.requestFullscreen()
+        .then(() => {
+          // Android: turn landscape projects sideways like a native player.
+          const orientation = screen.orientation as ScreenOrientation & { lock?: (type: string) => Promise<void> };
+          if (isMobileHero && viewerDimensions.width > viewerDimensions.height) orientation?.lock?.("landscape").catch(() => {});
+        })
+        .catch(() => setViewerImmersive(true));
+      // Some embedded/in-app browsers never settle the request; don't leave
+      // the button doing nothing on a phone.
+      if (isMobileHero) {
+        window.setTimeout(() => {
+          if (document.fullscreenElement !== root) setViewerImmersive(true);
+        }, 1000);
+      }
+      return;
+    }
+    // iPhone Safari can't make page elements full screen. Ask Vimeo's player
+    // for its native full screen; if that doesn't happen, show the page's
+    // own full-screen view instead.
+    nativeFullscreenPending.current = true;
+    viewerFrame.current?.contentWindow?.postMessage({ method: "requestFullscreen" }, "https://player.vimeo.com");
+    window.setTimeout(() => {
+      if (!nativeFullscreenPending.current) return;
+      nativeFullscreenPending.current = false;
+      setViewerImmersive(true);
+    }, 800);
+  }, [viewerImmersive, isMobileHero, viewerDimensions]);
+
+  const onViewerTouchStart = (event: React.TouchEvent<HTMLDivElement>) => {
+    if (!isMobileHero || viewerImmersive || event.touches.length !== 1) return;
+    if ((event.target as Element).closest(".viewer-progress, .viewer-fullscreen, .viewer-mobile-bar, .viewer-top")) return;
+    const touch = event.touches[0];
+    swipeStart.current = { x: touch.clientX, y: touch.clientY, t: performance.now(), horizontal: false };
+  };
+
+  const onViewerTouchMove = (event: React.TouchEvent<HTMLDivElement>) => {
+    const start = swipeStart.current;
+    if (!start) return;
+    const dx = event.touches[0].clientX - start.x;
+    const dy = event.touches[0].clientY - start.y;
+    if (!start.horizontal) {
+      if (Math.abs(dx) > 10 && Math.abs(dx) > Math.abs(dy)) {
+        start.horizontal = true;
+      } else {
+        if (Math.abs(dy) > 10) swipeStart.current = null;
+        return;
+      }
+    }
+    setDragSettling(false);
+    setDragX(dx);
+  };
+
+  // Past a third of the screen (or a quick flick) goes to the neighbouring
+  // project; otherwise it springs back.
+  const onViewerTouchEnd = (event: React.TouchEvent<HTMLDivElement>) => {
+    const start = swipeStart.current;
+    swipeStart.current = null;
+    if (!start?.horizontal) return;
+    lastSwipeAt.current = performance.now();
+    const dx = event.changedTouches[0].clientX - start.x;
+    const width = window.innerWidth;
+    const flick = Math.abs(dx) > 40 && Math.abs(dx) / (performance.now() - start.t) > 0.5;
+    setDragSettling(true);
+    if (Math.abs(dx) > width / 3 || flick) {
+      setDragX(dx < 0 ? -width : width);
+      window.setTimeout(() => {
+        setDragSettling(false);
+        setDragX(null);
+        goTo(dx < 0 ? 1 : -1);
+      }, 200);
+    } else {
+      setDragX(0);
+      window.setTimeout(() => {
+        setDragSettling(false);
+        setDragX(null);
+      }, 220);
+    }
+  };
 
   const seekViewer = useCallback((clientX: number, bounds: DOMRect) => {
     if (!viewerProgress.duration) return;
@@ -461,6 +573,9 @@ export default function Portfolio({ initialContent, initialIsMobile }: { initial
   // reaching down for those controls would trigger all of that at the same
   // time — a moving target right when precision matters most.
   const trackViewerCursor = (event: React.MouseEvent<HTMLDivElement>) => {
+    // Taps on touch screens also fire mouse events; edge-to-close is a
+    // desktop cursor behavior.
+    if (isMobileHero) return;
     const bounds = viewerMedia.current?.getBoundingClientRect();
     const videoAspect = viewerDimensions.width / viewerDimensions.height;
     // The bottom 5% of the screen is a dead zone for this: it's where the
@@ -787,7 +902,7 @@ export default function Portfolio({ initialContent, initialIsMobile }: { initial
 
       {current && (
         <div
-          className={`viewer ${viewerAtEdge ? "at-edge" : ""} ${viewerPlaying ? "is-playing" : ""}`}
+          className={`viewer ${viewerAtEdge ? "at-edge" : ""} ${viewerPlaying ? "is-playing" : ""} ${viewerImmersive ? "immersive" : ""}`}
           data-orientation={viewerDimensions.width >= viewerDimensions.height ? "horizontal" : "vertical"}
           style={{ "--mobile-credit-top": mobileVideoBottom !== null ? `${mobileVideoBottom}px` : undefined } as React.CSSProperties}
           role="dialog"
@@ -795,10 +910,33 @@ export default function Portfolio({ initialContent, initialIsMobile }: { initial
           aria-label={`${current.title} video player`}
           onMouseMove={trackViewerCursor}
           onMouseLeave={() => setCursor((position) => ({ ...position, visible: false }))}
-          onClick={() => viewerAtEdge ? close() : toggleViewer()}
+          onClick={() => {
+            if (performance.now() - lastSwipeAt.current < 400) return;
+            if (viewerAtEdge) close(); else toggleViewer();
+          }}
+          onTouchStart={onViewerTouchStart}
+          onTouchMove={onViewerTouchMove}
+          onTouchEnd={onViewerTouchEnd}
+          onTouchCancel={() => { swipeStart.current = null; setDragX(null); setDragSettling(false); }}
           ref={viewerRoot}
         >
-          <div className="viewer-media" ref={viewerMedia}>
+          <div
+            className={`viewer-media ${dragSettling ? "settling" : ""} ${viewerSlide ? `slide-${viewerSlide}` : ""}`}
+            style={dragX !== null ? { transform: `translateX(${dragX}px)` } : undefined}
+            onAnimationEnd={() => setViewerSlide(null)}
+            ref={viewerMedia}
+          >
+            {dragX !== null && ([["prev", -1], ["next", 1]] as const).map(([side, offset]) => {
+              const neighbour = visible[(viewerIndex! + offset + visible.length) % visible.length];
+              return (
+                <div className={`viewer-peek ${side}`} key={side} aria-hidden="true">
+                  <div className="viewer-peek-frame" style={{ background: neighbour.accent }}>
+                    {neighbour.thumbnailUrl && <img src={neighbour.thumbnailUrl} alt="" />}
+                  </div>
+                  <span>{neighbour.title}</span>
+                </div>
+              );
+            })}
             <div
               className="viewer-video-rect"
               style={videoRect ? { left: `${videoRect.left}%`, top: `${videoRect.top}%`, width: `${videoRect.width}%`, height: `${videoRect.height}%` } : undefined}
@@ -828,7 +966,7 @@ export default function Portfolio({ initialContent, initialIsMobile }: { initial
                     onClick={toggleFullscreen}
                     onMouseEnter={() => setCursorSuppressed(true)}
                     onMouseLeave={() => setCursorSuppressed(false)}
-                    aria-label={viewerFullscreen ? "Exit fullscreen" : "Enter fullscreen"}
+                    aria-label={viewerFullscreen || viewerImmersive ? "Exit fullscreen" : "Enter fullscreen"}
                   >
                     <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.2" strokeLinecap="round" aria-hidden="true">
                       <path d="M3 7V3h4" /><path d="M21 7V3h-4" /><path d="M3 17v4h4" /><path d="M21 17v4h-4" />
@@ -859,6 +997,11 @@ export default function Portfolio({ initialContent, initialIsMobile }: { initial
             <div className={`viewer-credit ${viewerAtEdge ? "" : "faded"}`}>{current.credits.map((credit) => `${credit.label} by ${credit.value}`).join(" · ")}</div>
           ) : null}
           <div className={`viewer-count ${viewerAtEdge ? "" : "faded"}`}>{String(viewerIndex! + 1).padStart(2, "0")} / {String(visible.length).padStart(2, "0")}</div>
+          <div className="viewer-mobile-bar" onClick={(event) => event.stopPropagation()}>
+            <button type="button" onClick={() => goTo(-1)} aria-label="Previous project">← PREV</button>
+            <span>{String(viewerIndex! + 1).padStart(2, "0")} / {String(visible.length).padStart(2, "0")}</span>
+            <button type="button" onClick={() => goTo(1)} aria-label="Next project">NEXT →</button>
+          </div>
           <span
             className={`viewer-cursor ${cursor.visible && !cursorSuppressed ? "visible" : ""}`}
             style={{ transform: `translate3d(${cursor.x}px, ${cursor.y}px, 0) translateY(-50%)` }}
