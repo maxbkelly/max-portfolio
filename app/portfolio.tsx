@@ -211,7 +211,6 @@ export default function Portfolio({ initialContent, initialIsMobile }: { initial
   const [videoRect, setVideoRect] = useState<{ top: number; left: number; width: number; height: number } | null>(null);
   const [dimensionsKnown, setDimensionsKnown] = useState(false);
   const [viewerFullscreen, setViewerFullscreen] = useState(false);
-  const [viewerImmersive, setViewerImmersive] = useState(false);
   const [dragX, setDragX] = useState<number | null>(null);
   const [dragSettling, setDragSettling] = useState(false);
   const [viewerSlide, setViewerSlide] = useState<"next" | "prev" | null>(null);
@@ -232,7 +231,7 @@ export default function Portfolio({ initialContent, initialIsMobile }: { initial
   const viewerFrame = useRef<HTMLIFrameElement>(null);
   const viewerMedia = useRef<HTMLDivElement>(null);
   const viewerRoot = useRef<HTMLDivElement>(null);
-  const nativeFullscreenPending = useRef(false);
+  const fullscreenRetryOnPlay = useRef(false);
   const swipeStart = useRef<{ x: number; y: number; t: number; horizontal: boolean } | null>(null);
   const lastSwipeAt = useRef(0);
   const activeSection = content.sections.find((section) => section.id === category) || content.sections[0];
@@ -286,7 +285,6 @@ export default function Portfolio({ initialContent, initialIsMobile }: { initial
   const close = useCallback(() => {
     setViewerIndex(null);
     setViewerPlaying(false);
-    setViewerImmersive(false);
   }, []);
   const move = useCallback((direction: number) => {
     setViewerPlaying(false);
@@ -340,12 +338,13 @@ export default function Portfolio({ initialContent, initialIsMobile }: { initial
         if (data?.event === "ready") {
           requestViewerDimensions();
           viewerFrame.current?.contentWindow?.postMessage({ method: "addEventListener", value: "timeupdate" }, "https://player.vimeo.com");
-          viewerFrame.current?.contentWindow?.postMessage({ method: "addEventListener", value: "fullscreenchange" }, "https://player.vimeo.com");
+          viewerFrame.current?.contentWindow?.postMessage({ method: "addEventListener", value: "play" }, "https://player.vimeo.com");
         }
-        if (data?.event === "fullscreenchange") nativeFullscreenPending.current = false;
-        if (data?.event === "error" && data.data?.method === "requestFullscreen" && nativeFullscreenPending.current) {
-          nativeFullscreenPending.current = false;
-          setViewerImmersive(true);
+        // iPhone refuses full screen for a video that hasn't started yet, so
+        // a request made from a paused video is repeated the moment it starts.
+        if (data?.event === "play" && fullscreenRetryOnPlay.current) {
+          fullscreenRetryOnPlay.current = false;
+          viewerFrame.current?.contentWindow?.postMessage({ method: "requestFullscreen" }, "https://player.vimeo.com");
         }
         if (data?.method === "getVideoWidth" && Number.isFinite(data.value)) {
           setViewerDimensions((dimensions) => ({ ...dimensions, width: data.value }));
@@ -418,7 +417,7 @@ export default function Portfolio({ initialContent, initialIsMobile }: { initial
       window.removeEventListener("resize", updateVideoRect);
       window.removeEventListener("orientationchange", updateVideoRect);
     };
-  }, [viewerIndex, viewerDimensions, dimensionsKnown, viewerImmersive]);
+  }, [viewerIndex, viewerDimensions, dimensionsKnown]);
 
   useEffect(() => {
     const onFullscreenChange = () => {
@@ -432,10 +431,6 @@ export default function Portfolio({ initialContent, initialIsMobile }: { initial
 
   const toggleFullscreen = useCallback((event: React.MouseEvent) => {
     event.stopPropagation();
-    if (viewerImmersive) {
-      setViewerImmersive(false);
-      return;
-    }
     if (document.fullscreenElement) {
       document.exitFullscreen();
       return;
@@ -448,30 +443,26 @@ export default function Portfolio({ initialContent, initialIsMobile }: { initial
           const orientation = screen.orientation as ScreenOrientation & { lock?: (type: string) => Promise<void> };
           if (isMobileHero && viewerDimensions.width > viewerDimensions.height) orientation?.lock?.("landscape").catch(() => {});
         })
-        .catch(() => setViewerImmersive(true));
-      // Some embedded/in-app browsers never settle the request; don't leave
-      // the button doing nothing on a phone.
-      if (isMobileHero) {
-        window.setTimeout(() => {
-          if (document.fullscreenElement !== root) setViewerImmersive(true);
-        }, 1000);
-      }
+        .catch(() => {});
       return;
     }
-    // iPhone Safari can't make page elements full screen. Ask Vimeo's player
-    // for its native full screen; if that doesn't happen, show the page's
-    // own full-screen view instead.
-    nativeFullscreenPending.current = true;
-    viewerFrame.current?.contentWindow?.postMessage({ method: "requestFullscreen" }, "https://player.vimeo.com");
-    window.setTimeout(() => {
-      if (!nativeFullscreenPending.current) return;
-      nativeFullscreenPending.current = false;
-      setViewerImmersive(true);
-    }, 800);
-  }, [viewerImmersive, isMobileHero, viewerDimensions]);
+    // iPhone Safari can't make page elements full screen, but Vimeo's player
+    // can open the native iPhone player. That's refused while the video is
+    // still paused, so start it too, and ask again once it's playing (see
+    // the "play" handler above). If it still doesn't open, a second press
+    // will, since the video is playing by then.
+    const player = viewerFrame.current?.contentWindow;
+    if (!viewerPlaying) {
+      fullscreenRetryOnPlay.current = true;
+      window.setTimeout(() => { fullscreenRetryOnPlay.current = false; }, 3000);
+      player?.postMessage({ method: "play" }, "https://player.vimeo.com");
+      setViewerPlaying(true);
+    }
+    player?.postMessage({ method: "requestFullscreen" }, "https://player.vimeo.com");
+  }, [isMobileHero, viewerDimensions, viewerPlaying]);
 
   const onViewerTouchStart = (event: React.TouchEvent<HTMLDivElement>) => {
-    if (!isMobileHero || viewerImmersive || event.touches.length !== 1) return;
+    if (!isMobileHero || event.touches.length !== 1) return;
     if ((event.target as Element).closest(".viewer-progress, .viewer-fullscreen, .viewer-mobile-bar, .viewer-top")) return;
     const touch = event.touches[0];
     swipeStart.current = { x: touch.clientX, y: touch.clientY, t: performance.now(), horizontal: false };
@@ -902,7 +893,7 @@ export default function Portfolio({ initialContent, initialIsMobile }: { initial
 
       {current && (
         <div
-          className={`viewer ${viewerAtEdge ? "at-edge" : ""} ${viewerPlaying ? "is-playing" : ""} ${viewerImmersive ? "immersive" : ""}`}
+          className={`viewer ${viewerAtEdge ? "at-edge" : ""} ${viewerPlaying ? "is-playing" : ""}`}
           data-orientation={viewerDimensions.width >= viewerDimensions.height ? "horizontal" : "vertical"}
           style={{ "--mobile-credit-top": mobileVideoBottom !== null ? `${mobileVideoBottom}px` : undefined } as React.CSSProperties}
           role="dialog"
@@ -966,7 +957,7 @@ export default function Portfolio({ initialContent, initialIsMobile }: { initial
                     onClick={toggleFullscreen}
                     onMouseEnter={() => setCursorSuppressed(true)}
                     onMouseLeave={() => setCursorSuppressed(false)}
-                    aria-label={viewerFullscreen || viewerImmersive ? "Exit fullscreen" : "Enter fullscreen"}
+                    aria-label={viewerFullscreen ? "Exit fullscreen" : "Enter fullscreen"}
                   >
                     <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.2" strokeLinecap="round" aria-hidden="true">
                       <path d="M3 7V3h4" /><path d="M21 7V3h-4" /><path d="M3 17v4h4" /><path d="M21 17v4h-4" />

@@ -152,16 +152,7 @@ nav button:hover::after { right: 0; }
   .viewer-peek span { display: block; margin-top: 14px; padding: 0 16px; font-size: 11px; letter-spacing: .12em; }
   .viewer:fullscreen .viewer-media { inset: 0; }
   .viewer:fullscreen .viewer-mobile-bar { display: none; }
-  .viewer:fullscreen .viewer-progress, .viewer.immersive .viewer-progress { top: auto; bottom: 16px; }
-  .viewer:fullscreen .viewer-fullscreen, .viewer.immersive .viewer-fullscreen { top: auto; bottom: 10px; }
-  /* iPhone full screen: Safari can't make the page itself full screen, so
-     hide everything but the video and turn landscape projects sideways to
-     fill the phone, like a native player. */
-  .viewer.immersive .viewer-media { inset: 0; }
-  .viewer.immersive[data-orientation="horizontal"] .viewer-media { inset: auto; top: 50%; left: 50%; width: 100vh; width: 100dvh; height: 100vw; transform: translate(-50%, -50%) rotate(90deg); }
-  .viewer.immersive .viewer-top, .viewer.immersive .viewer-mobile-bar, .viewer.immersive[data-orientation] .viewer-credit { display: none; }
-}
-@media (pointer: coarse) and (orientation: landscape) {
-  .viewer.immersive .viewer-top, .viewer.immersive .viewer-arrow, .viewer.immersive[data-orientation] .viewer-credit, .viewer.immersive[data-orientation] .viewer-count { display: none; }
+  .viewer:fullscreen .viewer-progress { top: auto; bottom: 16px; }
+  .viewer:fullscreen .viewer-fullscreen { top: auto; bottom: 10px; }
 }
 @media (prefers-reduced-motion: reduce) { *, *::before, *::after { scroll-behavior: auto !important; animation-duration: .01ms !important; transition-duration: .01ms !important; } }
