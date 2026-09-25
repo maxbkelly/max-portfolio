@@ -214,6 +214,8 @@ export default function Portfolio({ initialContent, initialIsMobile }: { initial
   const [mobileVideoBottom, setMobileVideoBottom] = useState<number | null>(null);
   const [heroMuted, setHeroMuted] = useState(true);
   const [heroReady, setHeroReady] = useState(false);
+  const [animationPlaying, setAnimationPlaying] = useState(false);
+  const [animationMinDone, setAnimationMinDone] = useState(false);
   const [isMobileHero, setIsMobileHero] = useState(initialIsMobile);
   const [heroFileFailed, setHeroFileFailed] = useState(false);
   const [heroCursor, setHeroCursor] = useState({ x: 0, y: 0 });
@@ -240,6 +242,11 @@ export default function Portfolio({ initialContent, initialIsMobile }: { initial
   const loadingAnimationUrl = isMobileHero
     ? heroFileUrl ? content.loadingAnimationMobileUrl : undefined
     : content.loadingAnimationDesktopUrl;
+  // Once the animation is actually on screen, keep it up for at least
+  // 1.5s even if the reel is ready sooner, so a quick flash doesn't look
+  // like a glitch. If the reel is ready before the animation ever started
+  // playing, skip it rather than hold the reel back.
+  const hideAnimation = heroReady && (!animationPlaying || animationMinDone);
 
   useEffect(() => {
     if (initialContent) return;
@@ -645,7 +652,7 @@ export default function Portfolio({ initialContent, initialIsMobile }: { initial
         onClick={toggleHeroSound}
         onMouseMove={(event) => setHeroCursor({ x: event.clientX, y: event.clientY })}
       >
-        {loadingAnimationUrl && !heroReady && (
+        {loadingAnimationUrl && !hideAnimation && (
           <video
             ref={heroPlaceholder}
             className="hero-video hero-placeholder"
@@ -655,6 +662,11 @@ export default function Portfolio({ initialContent, initialIsMobile }: { initial
             playsInline
             aria-hidden="true"
             onClick={(event) => { event.currentTarget.play().catch(() => {}); }}
+            onPlaying={() => {
+              if (animationPlaying) return;
+              setAnimationPlaying(true);
+              window.setTimeout(() => setAnimationMinDone(true), 1500);
+            }}
           />
         )}
         {/* Waits for contentReady instead of mounting immediately with
