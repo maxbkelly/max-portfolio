@@ -672,6 +672,18 @@ export default function Portfolio({ initialContent, initialIsMobile }: { initial
     setHeroMuted(nextMuted);
   };
 
+  // Opening a project mutes the homepage reel so its sound doesn't compete
+  // with the project's. It stays muted after closing; the SOUND button
+  // shows that, and turns it back on.
+  const viewerOpen = viewerIndex !== null;
+  useEffect(() => {
+    if (!viewerOpen) return;
+    if (heroFile.current) heroFile.current.muted = true;
+    heroFrame.current?.contentWindow?.postMessage({ method: "setMuted", value: true }, "https://player.vimeo.com");
+    heroFrame.current?.contentWindow?.postMessage({ method: "setVolume", value: 0 }, "https://player.vimeo.com");
+    setHeroMuted(true);
+  }, [viewerOpen]);
+
   return (
     <main>
       <header className="topbar">
