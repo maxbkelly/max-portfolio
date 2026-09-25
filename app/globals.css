@@ -124,4 +124,44 @@ nav button:hover::after { right: 0; }
   .hero-sound-mobile { display: block; position: absolute; right: 3vw; bottom: 28px; }
 }
 @media (min-width: 701px) and (max-width: 980px) { .grid { grid-template-columns: repeat(2, 42%); } }
+/* Phone project viewer (portrait): video centered between the title and a
+   bottom bar, progress/fullscreen in their own row under the video, credit
+   below that, prev/count/next in the thumb zone, swipe between projects.
+   Landscape phones and desktop keep the layout above. */
+.viewer-mobile-bar, .viewer-peek { display: none; }
+@keyframes viewer-slide-next { from { transform: translateX(100%); } }
+@keyframes viewer-slide-prev { from { transform: translateX(-100%); } }
+@media (pointer: coarse) and (orientation: portrait) {
+  .viewer-media, .viewer.at-edge .viewer-media { inset: 64px 0 150px; transition: none; }
+  .viewer-media.settling { transition: transform .22s cubic-bezier(.22,.8,.2,1); }
+  .viewer-media.slide-next { animation: viewer-slide-next .3s cubic-bezier(.22,.8,.2,1); }
+  .viewer-media.slide-prev { animation: viewer-slide-prev .3s cubic-bezier(.22,.8,.2,1); }
+  .viewer-arrow, .viewer[data-orientation] .viewer-count { display: none; }
+  .viewer-progress { top: calc(100% + 10px); bottom: auto; left: 16px; right: 50px; }
+  .viewer-fullscreen { top: calc(100% + 7px); bottom: auto; }
+  .viewer[data-orientation] .viewer-credit,
+  .viewer[data-orientation].is-playing .viewer-credit { top: calc(var(--mobile-credit-top, 0px) + 46px); bottom: auto; left: 16px; right: 16px; transform: none; text-align: center; white-space: normal; opacity: .75; }
+  .viewer-mobile-bar { display: flex; position: absolute; z-index: 3; left: 0; right: 0; bottom: 0; height: 64px; padding: 0 16px 10px; align-items: center; justify-content: space-between; border-top: 1px solid #242424; font-size: 11px; letter-spacing: .12em; }
+  .viewer-mobile-bar button { padding: 12px 0; letter-spacing: inherit; }
+  .viewer-mobile-bar span { color: var(--muted); }
+  .viewer-peek { display: block; position: absolute; top: 50%; width: 100%; transform: translateY(-50%); pointer-events: none; }
+  .viewer-peek.next { left: calc(100% + 16px); }
+  .viewer-peek.prev { right: calc(100% + 16px); }
+  .viewer-peek-frame { width: 100%; aspect-ratio: 16 / 9; overflow: hidden; }
+  .viewer-peek-frame img { width: 100%; height: 100%; object-fit: cover; display: block; }
+  .viewer-peek span { display: block; margin-top: 14px; padding: 0 16px; font-size: 11px; letter-spacing: .12em; }
+  .viewer:fullscreen .viewer-media { inset: 0; }
+  .viewer:fullscreen .viewer-mobile-bar { display: none; }
+  .viewer:fullscreen .viewer-progress, .viewer.immersive .viewer-progress { top: auto; bottom: 16px; }
+  .viewer:fullscreen .viewer-fullscreen, .viewer.immersive .viewer-fullscreen { top: auto; bottom: 10px; }
+  /* iPhone full screen: Safari can't make the page itself full screen, so
+     hide everything but the video and turn landscape projects sideways to
+     fill the phone, like a native player. */
+  .viewer.immersive .viewer-media { inset: 0; }
+  .viewer.immersive[data-orientation="horizontal"] .viewer-media { inset: auto; top: 50%; left: 50%; width: 100vh; width: 100dvh; height: 100vw; transform: translate(-50%, -50%) rotate(90deg); }
+  .viewer.immersive .viewer-top, .viewer.immersive .viewer-mobile-bar, .viewer.immersive[data-orientation] .viewer-credit { display: none; }
+}
+@media (pointer: coarse) and (orientation: landscape) {
+  .viewer.immersive .viewer-top, .viewer.immersive .viewer-arrow, .viewer.immersive[data-orientation] .viewer-credit, .viewer.immersive[data-orientation] .viewer-count { display: none; }
+}
 @media (prefers-reduced-motion: reduce) { *, *::before, *::after { scroll-behavior: auto !important; animation-duration: .01ms !important; transition-duration: .01ms !important; } }
