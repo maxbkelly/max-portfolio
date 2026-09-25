@@ -3,6 +3,17 @@
 import { useCallback, useEffect, useLayoutEffect, useRef, useState } from "react";
 import { fallbackContent, loadCmsContent, type PortfolioContent, type Project } from "./data";
 
+// Where a video of the given aspect ratio sits when letterboxed/pillarboxed
+// inside a box, in percentages of that box.
+function fitRect(videoAspect: number, boxAspect: number) {
+  if (videoAspect > boxAspect) {
+    const height = (boxAspect / videoAspect) * 100;
+    return { left: 0, top: (100 - height) / 2, width: 100, height };
+  }
+  const width = (videoAspect / boxAspect) * 100;
+  return { left: (100 - width) / 2, top: 0, width, height: 100 };
+}
+
 let measureProbe: HTMLSpanElement | null = null;
 // Canvas measureText ignores letter-spacing (and can resolve condensed font
 // stacks differently than the DOM), so measure with a real hidden element
@@ -214,6 +225,10 @@ export default function Portfolio({ initialContent, initialIsMobile }: { initial
   const [dragX, setDragX] = useState<number | null>(null);
   const [dragSettling, setDragSettling] = useState(false);
   const [viewerSlide, setViewerSlide] = useState<"next" | "prev" | null>(null);
+  const [viewerFrameReady, setViewerFrameReady] = useState(false);
+  const [peekBoxAspect, setPeekBoxAspect] = useState(375 / 598);
+  const [vimeoThumbs, setVimeoThumbs] = useState<Record<string, { url: string; aspect: number }>>({});
+  const thumbRequests = useRef(new Set<string>());
   const [mobileVideoBottom, setMobileVideoBottom] = useState<number | null>(null);
   const [heroMuted, setHeroMuted] = useState(true);
   const [heroReady, setHeroReady] = useState(false);
@@ -328,6 +343,10 @@ export default function Portfolio({ initialContent, initialIsMobile }: { initial
     setVideoRect(null);
     setDimensionsKnown(false);
     setViewerProgress({ seconds: 0, duration: 0 });
+    setViewerFrameReady(false);
+    // Backstop so the player is never left hidden behind its poster if
+    // Vimeo's "ready" message doesn't arrive.
+    const revealFrame = window.setTimeout(() => setViewerFrameReady(true), 4000);
     let widthKnown = false;
     let heightKnown = false;
 
@@ -336,6 +355,7 @@ export default function Portfolio({ initialContent, initialIsMobile }: { initial
       try {
         const data = typeof event.data === "string" ? JSON.parse(event.data) : event.data;
         if (data?.event === "ready") {
+          setViewerFrameReady(true);
           requestViewerDimensions();
           viewerFrame.current?.contentWindow?.postMessage({ method: "addEventListener", value: "timeupdate" }, "https://player.vimeo.com");
           viewerFrame.current?.contentWindow?.postMessage({ method: "addEventListener", value: "play" }, "https://player.vimeo.com");
@@ -369,9 +389,32 @@ export default function Portfolio({ initialContent, initialIsMobile }: { initial
     window.addEventListener("message", receive);
     return () => {
       window.clearTimeout(retry);
+      window.clearTimeout(revealFrame);
       window.removeEventListener("message", receive);
     };
   }, [viewerIndex, requestViewerDimensions]);
+
+  // Phones: fetch Vimeo's own poster frame (and the video's shape) for the
+  // open project and its neighbours, so the swipe preview and the moment
+  // before the player loads show the real frame, not the square grid
+  // thumbnail. Vimeo's public oEmbed lookup covers unlisted videos too.
+  useEffect(() => {
+    if (viewerIndex === null || !isMobileHero || !visible.length) return;
+    for (const offset of [0, 1, -1]) {
+      const project = visible[(viewerIndex + offset + visible.length) % visible.length];
+      if (thumbRequests.current.has(project.vimeoId)) continue;
+      thumbRequests.current.add(project.vimeoId);
+      const vimeoUrl = `https://vimeo.com/${project.vimeoId}${project.vimeoHash ? `/${project.vimeoHash}` : ""}`;
+      fetch(`https://vimeo.com/api/oembed.json?url=${encodeURIComponent(vimeoUrl)}&width=1280`)
+        .then((response) => response.ok ? response.json() : Promise.reject(new Error(String(response.status))))
+        .then((data: { thumbnail_url?: string; width?: number; height?: number }) => {
+          if (!data.thumbnail_url || !data.width || !data.height) return;
+          new Image().src = data.thumbnail_url;
+          setVimeoThumbs((thumbs) => ({ ...thumbs, [project.vimeoId]: { url: data.thumbnail_url!, aspect: data.width! / data.height! } }));
+        })
+        .catch(() => thumbRequests.current.delete(project.vimeoId));
+    }
+  }, [viewerIndex, isMobileHero, visible]);
 
   // The video letterboxes/pillarboxes inside .viewer-media whenever its
   // aspect ratio doesn't match the container's, so the progress bar and
@@ -395,18 +438,9 @@ export default function Portfolio({ initialContent, initialIsMobile }: { initial
       const media = viewerMedia.current;
       const videoAspect = viewerDimensions.width / viewerDimensions.height;
       if (!media || !Number.isFinite(videoAspect) || videoAspect <= 0) return;
-      // offsetWidth/Height are the untransformed layout size; the bounding
-      // rect would be swapped while the phone full-screen view rotates it.
+      // offsetWidth/Height ignore the transform applied while swiping.
       const bounds = { top: media.getBoundingClientRect().top, width: media.offsetWidth, height: media.offsetHeight };
-      const containerAspect = bounds.width / bounds.height;
-      let rect;
-      if (videoAspect > containerAspect) {
-        const heightPercent = (containerAspect / videoAspect) * 100;
-        rect = { left: 0, top: (100 - heightPercent) / 2, width: 100, height: heightPercent };
-      } else {
-        const widthPercent = (videoAspect / containerAspect) * 100;
-        rect = { left: (100 - widthPercent) / 2, top: 0, width: widthPercent, height: 100 };
-      }
+      const rect = fitRect(videoAspect, bounds.width / bounds.height);
       setVideoRect(rect);
       setMobileVideoBottom(bounds.top + (rect.top / 100) * bounds.height + (rect.height / 100) * bounds.height);
     };
@@ -466,6 +500,8 @@ export default function Portfolio({ initialContent, initialIsMobile }: { initial
     if ((event.target as Element).closest(".viewer-progress, .viewer-fullscreen, .viewer-mobile-bar, .viewer-top")) return;
     const touch = event.touches[0];
     swipeStart.current = { x: touch.clientX, y: touch.clientY, t: performance.now(), horizontal: false };
+    const media = viewerMedia.current;
+    if (media) setPeekBoxAspect(media.offsetWidth / media.offsetHeight);
   };
 
   const onViewerTouchMove = (event: React.TouchEvent<HTMLDivElement>) => {
@@ -893,7 +929,7 @@ export default function Portfolio({ initialContent, initialIsMobile }: { initial
 
       {current && (
         <div
-          className={`viewer ${viewerAtEdge ? "at-edge" : ""} ${viewerPlaying ? "is-playing" : ""}`}
+          className={`viewer ${viewerAtEdge ? "at-edge" : ""} ${viewerPlaying ? "is-playing" : ""} ${viewerFrameReady ? "frame-ready" : ""}`}
           data-orientation={viewerDimensions.width >= viewerDimensions.height ? "horizontal" : "vertical"}
           style={{ "--mobile-credit-top": mobileVideoBottom !== null ? `${mobileVideoBottom}px` : undefined } as React.CSSProperties}
           role="dialog"
@@ -919,12 +955,15 @@ export default function Portfolio({ initialContent, initialIsMobile }: { initial
           >
             {dragX !== null && ([["prev", -1], ["next", 1]] as const).map(([side, offset]) => {
               const neighbour = visible[(viewerIndex! + offset + visible.length) % visible.length];
+              const thumb = vimeoThumbs[neighbour.vimeoId];
+              // Placed exactly where that video will sit once it loads.
+              const frame = fitRect(thumb?.aspect ?? 16 / 9, peekBoxAspect);
               return (
                 <div className={`viewer-peek ${side}`} key={side} aria-hidden="true">
-                  <div className="viewer-peek-frame" style={{ background: neighbour.accent }}>
-                    {neighbour.thumbnailUrl && <img src={neighbour.thumbnailUrl} alt="" />}
+                  <div className="viewer-peek-frame" style={{ left: `${frame.left}%`, top: `${frame.top}%`, width: `${frame.width}%`, height: `${frame.height}%` }}>
+                    {thumb && <img src={thumb.url} alt="" />}
                   </div>
-                  <span>{neighbour.title}</span>
+                  <span style={{ top: `calc(${frame.top + frame.height}% + 14px)` }}>{neighbour.title}</span>
                 </div>
               );
             })}
@@ -932,6 +971,9 @@ export default function Portfolio({ initialContent, initialIsMobile }: { initial
               className="viewer-video-rect"
               style={videoRect ? { left: `${videoRect.left}%`, top: `${videoRect.top}%`, width: `${videoRect.width}%`, height: `${videoRect.height}%` } : undefined}
             >
+              {isMobileHero && vimeoThumbs[current.vimeoId] && (
+                <img className="viewer-poster" src={vimeoThumbs[current.vimeoId].url} alt="" aria-hidden="true" />
+              )}
               <iframe
                 ref={viewerFrame}
                 key={current.id}
