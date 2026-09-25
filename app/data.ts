@@ -15,7 +15,15 @@ export type Project = {
   credits?: Credit[];
   thumbnailUrl?: string;
   hoverPreviewUrl?: string;
+  streamVideoId?: string;
+  streamThumbnailTime?: number;
 };
+
+// Cloudflare Stream account subdomain (public — it's in every playback URL).
+const STREAM_HOST = "https://customer-qjq3psc9xlff062z.cloudflarestream.com";
+export const streamHlsUrl = (videoId: string) => `${STREAM_HOST}/${videoId}/manifest/video.m3u8`;
+export const streamThumbnailUrl = (videoId: string, seconds: number) =>
+  `${STREAM_HOST}/${videoId}/thumbnails/thumbnail.jpg?time=${seconds}s&height=1080`;
 
 export type PortfolioSection = {
   id: string;
@@ -117,7 +125,7 @@ const query = `*[_type == "siteSettings" && _id == "siteSettings"][0]{
       enabled,
       "projects": projects[]{
         "placementId": _key,
-        ...@->{_id, title, client, projectName, vimeoUrl, accent, credits, "thumbnailUrl": thumbnail.asset->url + "?w=1000&q=75&auto=format", "hoverPreviewUrl": hoverPreview.asset->url}
+        ...@->{_id, title, client, projectName, vimeoUrl, accent, credits, "thumbnailUrl": thumbnail.asset->url + "?w=1000&q=75&auto=format", "hoverPreviewUrl": hoverPreview.asset->url, streamVideoId, streamThumbnailTime}
       }
     }
   }
@@ -153,6 +161,8 @@ type SanityResponse = {
         credits?: Credit[];
         thumbnailUrl?: string;
         hoverPreviewUrl?: string;
+        streamVideoId?: string;
+        streamThumbnailTime?: number;
       }>;
     }>;
   };
@@ -184,6 +194,8 @@ export async function loadCmsContent(signal?: AbortSignal): Promise<PortfolioCon
           ...(project.credits?.length ? {credits: project.credits} : {}),
           ...(project.thumbnailUrl ? {thumbnailUrl: project.thumbnailUrl} : {}),
           ...(project.hoverPreviewUrl ? {hoverPreviewUrl: project.hoverPreviewUrl} : {}),
+          ...(project.streamVideoId ? {streamVideoId: project.streamVideoId} : {}),
+          ...(typeof project.streamThumbnailTime === "number" ? {streamThumbnailTime: project.streamThumbnailTime} : {}),
           ...video,
         }];
       }),
