@@ -32,6 +32,20 @@ export const siteSettingsType = defineType({
       options: {accept: "video/mp4"},
     }),
     defineField({
+      name: "loadingAnimationDesktop",
+      title: "Loading animation — desktop",
+      description: "Optional. A short, small, silent MP4 (a few seconds, well under 1 MB) that loops on desktop while the homepage reel loads. Leave blank to show nothing until the reel starts.",
+      type: "file",
+      options: {accept: "video/mp4"},
+    }),
+    defineField({
+      name: "loadingAnimationMobile",
+      title: "Loading animation — mobile",
+      description: "Optional. Same as above, shown on phones while the mobile reel loads. It is fitted to the screen width, so nothing gets cropped. Leave blank to show nothing until the reel starts.",
+      type: "file",
+      options: {accept: "video/mp4"},
+    }),
+    defineField({
       name: "sections",
       title: "Navigation sections",
       description: "Drag to change the menu order. Add or remove sections here to change the website navigation.",

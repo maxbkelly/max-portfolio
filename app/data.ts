@@ -29,6 +29,8 @@ export type PortfolioContent = {
   homepageReel: {vimeoId: string; vimeoHash?: string};
   homepageReelMobile?: {vimeoId: string; vimeoHash?: string};
   homepageReelMobileVideoUrl?: string;
+  loadingAnimationDesktopUrl?: string;
+  loadingAnimationMobileUrl?: string;
   sections: PortfolioSection[];
   aboutParagraphs: string[];
   aboutHeadshotUrl?: string;
@@ -98,6 +100,8 @@ const query = `*[_type == "siteSettings" && _id == "siteSettings"][0]{
   homepageReelUrl,
   homepageReelMobileUrl,
   "homepageReelMobileVideoUrl": homepageReelMobileVideo.asset->url,
+  "loadingAnimationDesktopUrl": loadingAnimationDesktop.asset->url,
+  "loadingAnimationMobileUrl": loadingAnimationMobile.asset->url,
   aboutParagraph1,
   aboutParagraph2,
   aboutParagraph3,
@@ -123,6 +127,8 @@ type SanityResponse = {
     homepageReelUrl?: string;
     homepageReelMobileUrl?: string;
     homepageReelMobileVideoUrl?: string;
+    loadingAnimationDesktopUrl?: string;
+    loadingAnimationMobileUrl?: string;
     aboutParagraph1?: string;
     aboutParagraph2?: string;
     aboutParagraph3?: string;
@@ -191,6 +197,8 @@ export async function loadCmsContent(signal?: AbortSignal): Promise<PortfolioCon
     homepageReel,
     ...(homepageReelMobile ? {homepageReelMobile} : {}),
     ...(result.homepageReelMobileVideoUrl ? {homepageReelMobileVideoUrl: result.homepageReelMobileVideoUrl} : {}),
+    ...(result.loadingAnimationDesktopUrl ? {loadingAnimationDesktopUrl: result.loadingAnimationDesktopUrl} : {}),
+    ...(result.loadingAnimationMobileUrl ? {loadingAnimationMobileUrl: result.loadingAnimationMobileUrl} : {}),
     sections: sections.length ? sections : fallbackContent.sections,
     aboutParagraphs: aboutParagraphs.length ? aboutParagraphs : fallbackContent.aboutParagraphs,
     ...(result.aboutHeadshotUrl ? {aboutHeadshotUrl: result.aboutHeadshotUrl} : {}),

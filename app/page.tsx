@@ -3,18 +3,6 @@
 import { useCallback, useEffect, useLayoutEffect, useRef, useState } from "react";
 import { fallbackContent, loadCmsContent, type Project } from "./data";
 
-// Hosted on Sanity's file CDN rather than as a Workers static asset: Workers
-// static assets ignore Range requests (verified: a Range request still gets
-// back a plain 200, no Accept-Ranges), which is why looping this video used
-// to cause a visible stall — the browser can't cheaply seek back to the
-// start, so it has to re-fetch and re-decode the whole file, showing the
-// hero's bare background color for a beat. Sanity's CDN returns a proper 206
-// for the same request, so looping is instant. This is the same infra asset
-// as before (a short muted loop), just moved off the Workers domain — not a
-// Sanity Studio content field, since it needs to render before the CMS
-// fetch resolves.
-const HERO_PLACEHOLDER_URL = "https://cdn.sanity.io/files/j7kkjji4/production/b0bc9fd0f24fb38534fdd8bf6c3fe2aac44ce607.mp4";
-
 let measureProbe: HTMLSpanElement | null = null;
 // Canvas measureText ignores letter-spacing (and can resolve condensed font
 // stacks differently than the DOM), so measure with a real hidden element
@@ -243,6 +231,11 @@ export default function Home() {
   // Vimeo's iframe/player/config round trips entirely. Desktop never uses
   // it. Falls back to the Vimeo iframe if the file is missing or fails.
   const heroFileUrl = isMobileHero && !heroFileFailed ? content.homepageReelMobileVideoUrl : undefined;
+  // On phones the loading animation only fronts the native reel file; the
+  // Vimeo fallback there keeps showing the reel directly, as before.
+  const loadingAnimationUrl = isMobileHero
+    ? heroFileUrl ? content.loadingAnimationMobileUrl : undefined
+    : content.loadingAnimationDesktopUrl;
 
   useEffect(() => {
     const controller = new AbortController();
@@ -490,21 +483,14 @@ export default function Home() {
 
   const current = viewerIndex === null ? null : visible[viewerIndex];
 
-  // The instant-loading placeholder caused enough autoplay-policy trouble on
-  // phones that it's not worth it there — mobile just shows the Vimeo reel
-  // directly. This has to be decided via an effect, not render-time device
-  // detection: checking matchMedia during the initial render disagrees with
-  // the server (which has no window and would assume desktop), and that
-  // mismatch makes React discard and rebuild the whole tree on the client —
-  // destroying and recreating the Vimeo iframe in the process, which loses
-  // the autoplay eligibility that only applies to markup from the original
-  // HTML. useLayoutEffect runs after hydration is already reconciled, so it
-  // can't cause that mismatch, and fires before paint so there's no flash.
+  // Decided via an effect, not render-time device detection: checking
+  // matchMedia during the initial render disagrees with the server (which
+  // has no window and would assume desktop), and that mismatch makes React
+  // discard and rebuild the whole tree on the client. useLayoutEffect runs
+  // after hydration is already reconciled, so it can't cause that mismatch,
+  // and fires before paint so there's no flash.
   useLayoutEffect(() => {
-    if (window.matchMedia("(pointer: coarse)").matches) {
-      setHeroReady(true);
-      setIsMobileHero(true);
-    }
+    if (window.matchMedia("(pointer: coarse)").matches) setIsMobileHero(true);
   }, []);
 
   // Browsers correctly pause backgrounded video when a tab isn't visible —
@@ -538,10 +524,11 @@ export default function Home() {
     el.muted = true;
     el.setAttribute("muted", "");
     el.play().catch(() => { /* Ignored: worst case it shows a static first frame. */ });
-  }, []);
+  }, [loadingAnimationUrl]);
 
-  // The local placeholder plays instantly (no iframe/network handshake);
-  // once Vimeo confirms actual playback has started, cut away to it.
+  // The loading animation plays almost immediately (a small file, no
+  // iframe/player handshake); once Vimeo confirms actual playback has
+  // started, cut away to it.
   useEffect(() => {
     const receive = (event: MessageEvent) => {
       if (event.origin !== "https://player.vimeo.com" || event.source !== heroFrame.current?.contentWindow) return;
@@ -559,11 +546,11 @@ export default function Home() {
   }, []);
 
   const subscribeHeroEvents = () => {
-    // On mobile heroReady is already forced true before this ever fires
-    // (see the layout effect above), so there's nothing left to detect —
-    // skip this burst of postMessage traffic entirely rather than let it
-    // run for no purpose right as Vimeo is trying to autoplay.
-    if (heroReady) return;
+    // Phones only reach the Vimeo iframe as a fallback, with no loading
+    // animation in front of it, so there's nothing to cut away from — skip
+    // this burst of postMessage traffic rather than let it run for no
+    // purpose right as Vimeo is trying to autoplay.
+    if (heroReady || isMobileHero) return;
     const player = heroFrame.current?.contentWindow;
     player?.postMessage({ method: "addEventListener", value: "play" }, "https://player.vimeo.com");
     // A single getPaused check can land in the brief paused window before
@@ -582,13 +569,19 @@ export default function Home() {
 
   // Same approach as the placeholder: no autoPlay attribute (avoids the
   // "blocked, tap to retry" button on some phones), muted attribute set by
-  // hand, playback started from script.
+  // hand, playback started from script. The loading animation stays in
+  // front until the reel fires "playing" (see onPlaying below). If autoplay
+  // is blocked (e.g. iPhone Low Power Mode) or the reel is very slow, cut
+  // over anyway so the reel's first frame shows instead of a frozen
+  // animation.
   useEffect(() => {
     const el = heroFile.current;
     if (!el) return;
     el.muted = true;
     el.setAttribute("muted", "");
-    el.play().catch(() => { /* Blocked autoplay: shows the first frame instead. */ });
+    el.play().catch(() => setHeroReady(true));
+    const safetyNet = window.setTimeout(() => setHeroReady(true), 10000);
+    return () => window.clearTimeout(safetyNet);
   }, [heroFileUrl, contentReady]);
 
   const toggleHeroSound = () => {
@@ -626,11 +619,11 @@ export default function Home() {
         onClick={toggleHeroSound}
         onMouseMove={(event) => setHeroCursor({ x: event.clientX, y: event.clientY })}
       >
-        {!heroReady && (
+        {loadingAnimationUrl && !heroReady && (
           <video
             ref={heroPlaceholder}
             className="hero-video hero-placeholder"
-            src={HERO_PLACEHOLDER_URL}
+            src={loadingAnimationUrl}
             muted
             loop
             playsInline
@@ -657,6 +650,7 @@ export default function Home() {
             playsInline
             preload="auto"
             aria-label="Maximilian Kelly editors reel"
+            onPlaying={() => setHeroReady(true)}
             onError={() => setHeroFileFailed(true)}
           />
         )}
