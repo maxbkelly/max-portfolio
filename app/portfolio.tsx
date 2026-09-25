@@ -556,12 +556,16 @@ export default function Portfolio({ initialContent, initialIsMobile }: { initial
     const flick = Math.abs(dx) > 40 && Math.abs(dx) / (performance.now() - start.t) > 0.5;
     setDragSettling(true);
     if (Math.abs(dx) > width / 3 || flick) {
-      setDragX(dx < 0 ? -width : width);
+      // Settle so the neighbour's preview lands exactly where its video sits
+      // (the preview is offset by the 16px gap in .viewer-peek), then swap
+      // the project in place — no second slide-in, which read as the video
+      // loading twice.
+      setDragX(dx < 0 ? -(width + 16) : width + 16);
       window.setTimeout(() => {
         setDragSettling(false);
         setDragX(null);
-        goTo(dx < 0 ? 1 : -1);
-      }, 200);
+        move(dx < 0 ? 1 : -1);
+      }, 230);
     } else {
       setDragX(0);
       window.setTimeout(() => {
@@ -668,6 +672,24 @@ export default function Portfolio({ initialContent, initialIsMobile }: { initial
   const currentStreamId = current && isMobileHero && current.streamVideoId && streamFailedFor !== current.id ? current.streamVideoId : undefined;
   // The frame shown before a project plays and in the swipe preview: the
   // chosen Stream moment if set, otherwise Vimeo's own poster.
+  // iPhones don't load a native video until it's played, and for HLS often
+  // report 0×0 at first, so the layout (progress row, credit position)
+  // would never be computed. Use the shape from Vimeo's oEmbed until the
+  // video reports its own, and only update when the shape actually changes
+  // (adaptive quality steps keep the same aspect ratio).
+  useEffect(() => {
+    if (!currentStreamId || !current || dimensionsKnown) return;
+    const thumb = vimeoThumbs[current.vimeoId];
+    if (!thumb) return;
+    setViewerDimensions({ width: thumb.aspect * 1000, height: 1000 });
+    setDimensionsKnown(true);
+  }, [currentStreamId, current, vimeoThumbs, dimensionsKnown]);
+  const updateStreamDimensions = (video: HTMLVideoElement) => {
+    const { videoWidth: width, videoHeight: height } = video;
+    if (!width || !height) return;
+    setViewerDimensions((dimensions) => Math.abs(dimensions.width / dimensions.height - width / height) < 0.01 ? dimensions : { width, height });
+    setDimensionsKnown(true);
+  };
   const posterFor = (project: Project) =>
     project.streamVideoId && typeof project.streamThumbnailTime === "number"
       ? streamThumbnailUrl(project.streamVideoId, project.streamThumbnailTime)
@@ -1017,11 +1039,11 @@ export default function Portfolio({ initialContent, initialIsMobile }: { initial
                   preload="metadata"
                   aria-label={current.title}
                   onLoadedMetadata={(event) => {
-                    const video = event.currentTarget;
-                    setViewerDimensions({ width: video.videoWidth, height: video.videoHeight });
-                    setDimensionsKnown(true);
+                    updateStreamDimensions(event.currentTarget);
                     setViewerFrameReady(true);
                   }}
+                  onLoadedData={(event) => updateStreamDimensions(event.currentTarget)}
+                  onResize={(event) => updateStreamDimensions(event.currentTarget)}
                   onTimeUpdate={(event) => setViewerProgress({ seconds: event.currentTarget.currentTime, duration: event.currentTarget.duration || 0 })}
                   onPlay={() => setViewerPlaying(true)}
                   onPause={() => setViewerPlaying(false)}
