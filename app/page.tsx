@@ -223,11 +223,13 @@ export default function Home() {
   const [heroMuted, setHeroMuted] = useState(true);
   const [heroReady, setHeroReady] = useState(false);
   const [isMobileHero, setIsMobileHero] = useState(false);
+  const [heroFileFailed, setHeroFileFailed] = useState(false);
   const [heroCursor, setHeroCursor] = useState({ x: 0, y: 0 });
   const [cursor, setCursor] = useState({ x: 0, y: 0, visible: false });
   const [cursorSuppressed, setCursorSuppressed] = useState(false);
   const heroFrame = useRef<HTMLIFrameElement>(null);
   const heroPlaceholder = useRef<HTMLVideoElement>(null);
+  const heroFile = useRef<HTMLVideoElement>(null);
   const viewerFrame = useRef<HTMLIFrameElement>(null);
   const viewerMedia = useRef<HTMLDivElement>(null);
   const viewerRoot = useRef<HTMLDivElement>(null);
@@ -237,6 +239,10 @@ export default function Home() {
   // isMobileHero layout effect) — desktop always uses content.homepageReel,
   // unchanged. Falls back to the main reel if no mobile-specific one is set.
   const heroReel = isMobileHero && content.homepageReelMobile ? content.homepageReelMobile : content.homepageReel;
+  // Phones play the CMS video file directly when one is set, skipping
+  // Vimeo's iframe/player/config round trips entirely. Desktop never uses
+  // it. Falls back to the Vimeo iframe if the file is missing or fails.
+  const heroFileUrl = isMobileHero && !heroFileFailed ? content.homepageReelMobileVideoUrl : undefined;
 
   useEffect(() => {
     const controller = new AbortController();
@@ -511,6 +517,7 @@ export default function Home() {
       if (document.visibilityState !== "visible") return;
       heroFrame.current?.contentWindow?.postMessage({ method: "play" }, "https://player.vimeo.com");
       if (heroPlaceholder.current?.paused) heroPlaceholder.current.play().catch(() => {});
+      if (heroFile.current?.paused) heroFile.current.play().catch(() => {});
     };
     document.addEventListener("visibilitychange", resume);
     return () => document.removeEventListener("visibilitychange", resume);
@@ -573,8 +580,25 @@ export default function Home() {
     window.setTimeout(() => setHeroReady(true), 3000);
   };
 
+  // Same approach as the placeholder: no autoPlay attribute (avoids the
+  // "blocked, tap to retry" button on some phones), muted attribute set by
+  // hand, playback started from script.
+  useEffect(() => {
+    const el = heroFile.current;
+    if (!el) return;
+    el.muted = true;
+    el.setAttribute("muted", "");
+    el.play().catch(() => { /* Blocked autoplay: shows the first frame instead. */ });
+  }, [heroFileUrl, contentReady]);
+
   const toggleHeroSound = () => {
     const nextMuted = !heroMuted;
+    if (heroFile.current) {
+      heroFile.current.muted = nextMuted;
+      if (!nextMuted) heroFile.current.play().catch(() => {});
+      setHeroMuted(nextMuted);
+      return;
+    }
     heroFrame.current?.contentWindow?.postMessage(
       { method: "setMuted", value: nextMuted },
       "https://player.vimeo.com",
@@ -623,7 +647,20 @@ export default function Home() {
             entire bootstrap chain from zero with the right one, roughly
             doubling the real load time. Mounting once, already knowing the
             final URL, avoids that entirely. */}
-        {contentReady && (
+        {contentReady && heroFileUrl && (
+          <video
+            ref={heroFile}
+            className="hero-video hero-video-file"
+            src={heroFileUrl}
+            muted
+            loop
+            playsInline
+            preload="auto"
+            aria-label="Maximilian Kelly editors reel"
+            onError={() => setHeroFileFailed(true)}
+          />
+        )}
+        {contentReady && !heroFileUrl && (
           <iframe
             ref={heroFrame}
             className="hero-video"

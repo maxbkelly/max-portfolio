@@ -25,6 +25,13 @@ export const siteSettingsType = defineType({
       validation: (Rule) => Rule.uri({scheme: ["http", "https"]}),
     }),
     defineField({
+      name: "homepageReelMobileVideo",
+      title: "Mobile homepage reel — fast video file",
+      description: "Optional. A 9:16 MP4 (about 720×1280, under ~10 MB) that phones play directly instead of loading Vimeo, so the reel starts much faster on mobile data. Leave blank to use the Vimeo mobile reel above. Does not affect desktop.",
+      type: "file",
+      options: {accept: "video/mp4"},
+    }),
+    defineField({
       name: "sections",
       title: "Navigation sections",
       description: "Drag to change the menu order. Add or remove sections here to change the website navigation.",
