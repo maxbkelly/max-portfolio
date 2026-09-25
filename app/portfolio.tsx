@@ -224,6 +224,7 @@ export default function Portfolio({ initialContent, initialIsMobile }: { initial
   const heroFrame = useRef<HTMLIFrameElement>(null);
   const heroPlaceholder = useRef<HTMLVideoElement>(null);
   const heroFile = useRef<HTMLVideoElement>(null);
+  const reelHeld = useRef(false);
   const viewerFrame = useRef<HTMLIFrameElement>(null);
   const viewerMedia = useRef<HTMLDivElement>(null);
   const viewerRoot = useRef<HTMLDivElement>(null);
@@ -512,9 +513,9 @@ export default function Portfolio({ initialContent, initialIsMobile }: { initial
   useEffect(() => {
     const resume = () => {
       if (document.visibilityState !== "visible") return;
-      heroFrame.current?.contentWindow?.postMessage({ method: "play" }, "https://player.vimeo.com");
+      if (!reelHeld.current) heroFrame.current?.contentWindow?.postMessage({ method: "play" }, "https://player.vimeo.com");
       if (heroPlaceholder.current?.paused) heroPlaceholder.current.play().catch(() => {});
-      if (heroFile.current?.paused) heroFile.current.play().catch(() => {});
+      if (heroFile.current?.paused && !reelHeld.current) heroFile.current.play().catch(() => {});
     };
     document.addEventListener("visibilitychange", resume);
     return () => document.removeEventListener("visibilitychange", resume);
@@ -617,11 +618,44 @@ export default function Portfolio({ initialContent, initialIsMobile }: { initial
     return () => window.clearTimeout(safetyNet);
   }, [heroFileUrl, contentReady]);
 
+  // The reel still starts (so it buffers — iPhones often won't download a
+  // video that hasn't been told to play), but once it's confirmed ready
+  // while the loading animation is still up, it's paused on its first frame
+  // and only starts when the animation is removed, so nobody misses the
+  // opening of the reel behind it.
+  useEffect(() => {
+    if (!heroReady) return;
+    const hold = Boolean(loadingAnimationUrl) && !hideAnimation;
+    reelHeld.current = hold;
+    const file = heroFile.current;
+    const vimeo = heroFrame.current?.contentWindow;
+    if (hold) {
+      if (file) {
+        file.pause();
+        file.currentTime = 0;
+      }
+      // Vimeo's background mode overrides a single pause sent right as its
+      // autoplay kicks in, so keep re-sending it while the reel is held.
+      // No seek back to 0: in background mode a seek makes it start playing
+      // again on its own. It's caught within a fraction of a second of
+      // starting, so pausing where it is loses almost nothing.
+      if (vimeo) {
+        const pause = () => vimeo.postMessage({ method: "pause" }, "https://player.vimeo.com");
+        pause();
+        const repeat = window.setInterval(pause, 150);
+        return () => window.clearInterval(repeat);
+      }
+    } else {
+      file?.play().catch(() => {});
+      vimeo?.postMessage({ method: "play" }, "https://player.vimeo.com");
+    }
+  }, [heroReady, hideAnimation, loadingAnimationUrl]);
+
   const toggleHeroSound = () => {
     const nextMuted = !heroMuted;
     if (heroFile.current) {
       heroFile.current.muted = nextMuted;
-      if (!nextMuted) heroFile.current.play().catch(() => {});
+      if (!nextMuted && !reelHeld.current) heroFile.current.play().catch(() => {});
       setHeroMuted(nextMuted);
       return;
     }
