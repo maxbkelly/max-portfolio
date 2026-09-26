@@ -131,7 +131,7 @@ nav button:hover::after { right: 0; }
    Landscape phones and desktop keep the layout above. */
 .viewer-mobile-bar, .viewer-peek, .viewer-poster, .viewer-media-credit { display: none; }
 /* Poster held on top of a native video until it has drawn real frames. */
-.viewer-cover { position: absolute; inset: 0; z-index: 1; width: 100%; height: 100%; object-fit: contain; pointer-events: none; }
+.viewer-cover { position: absolute; top: -1px; left: -1px; z-index: 1; width: calc(100% + 2px); height: calc(100% + 2px); object-fit: cover; pointer-events: none; }
 @keyframes viewer-slide-next { from { transform: translateX(100%); } }
 @keyframes viewer-slide-prev { from { transform: translateX(-100%); } }
 @media (pointer: coarse) and (orientation: portrait) {
@@ -152,6 +152,7 @@ nav button:hover::after { right: 0; }
   .viewer-peek.prev { right: calc(100% + 16px); }
   .viewer-peek-frame { position: absolute; overflow: hidden; background: #111; }
   .viewer-peek-frame img { width: 100%; height: 100%; object-fit: cover; display: block; }
+  .viewer-peek-rect { position: absolute; }
   /* The credit belongs to each project's page (current and swipe previews)
      so it swipes with it; the fixed one is hidden on phones in portrait. */
   .viewer-media-credit { display: block; position: absolute; left: 16px; right: 16px; text-align: center; font-size: 10px; letter-spacing: .08em; text-transform: uppercase; opacity: .75; pointer-events: none; }
