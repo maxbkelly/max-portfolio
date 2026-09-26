@@ -19,6 +19,9 @@ function fitRect(videoAspect: number, boxAspect: number) {
 function streamPosterUrl(project: Project) {
   return project.streamVideoId ? streamThumbnailUrl(project.streamVideoId, project.streamThumbnailTime) : undefined;
 }
+function creditLine(project: Project) {
+  return project.credits?.length ? project.credits.map((credit) => `${credit.label.trim()} by ${credit.value.trim()}`).join(" · ") : "";
+}
 function posterKey(project: Project) {
   return streamPosterUrl(project) ?? `vimeo:${project.vimeoId}`;
 }
@@ -235,6 +238,7 @@ export default function Portfolio({ initialContent, initialIsMobile }: { initial
   const [dragSettling, setDragSettling] = useState(false);
   const [viewerSlide, setViewerSlide] = useState<"next" | "prev" | null>(null);
   const [viewerFrameReady, setViewerFrameReady] = useState(false);
+  const [viewerFirstFrame, setViewerFirstFrame] = useState(false);
   const [peekBoxAspect, setPeekBoxAspect] = useState(375 / 598);
   const [posters, setPosters] = useState<Record<string, { url: string; aspect: number }>>({});
   const posterRequests = useRef(new Set<string>());
@@ -364,6 +368,7 @@ export default function Portfolio({ initialContent, initialIsMobile }: { initial
     setDimensionsKnown(false);
     setViewerProgress({ seconds: 0, duration: 0 });
     setViewerFrameReady(false);
+    setViewerFirstFrame(false);
     // Backstop so the player is never left hidden behind its poster if
     // Vimeo's "ready" message doesn't arrive.
     const revealFrame = window.setTimeout(() => setViewerFrameReady(true), 4000);
@@ -705,6 +710,33 @@ export default function Portfolio({ initialContent, initialIsMobile }: { initial
     setViewerDimensions({ width: currentPosterAspect * 1000, height: 1000 });
     setDimensionsKnown(true);
   }, [currentStreamId, currentPosterAspect, dimensionsKnown]);
+  // After play, iOS hides the poster and shows black while it buffers, then
+  // draws one frame at about half size before snapping to full size. Keep
+  // the poster on top of the video until a few real frames have been drawn,
+  // so that all happens out of sight.
+  const revealAfterFirstFrames = (video: HTMLVideoElement) => {
+    if (viewerFirstFrame) return;
+    // Ignore if the viewer has moved on to another project meanwhile.
+    const reveal = () => { if (viewerVideo.current === video) setViewerFirstFrame(true); };
+    window.setTimeout(reveal, 1500);
+    const withFrames = video as HTMLVideoElement & { requestVideoFrameCallback?: (callback: () => void) => number };
+    if (!withFrames.requestVideoFrameCallback) {
+      const check = () => {
+        if (video.currentTime < 0.2) return;
+        video.removeEventListener("timeupdate", check);
+        reveal();
+      };
+      video.addEventListener("timeupdate", check);
+      return;
+    }
+    let frames = 0;
+    const onFrame = () => {
+      frames += 1;
+      if (frames >= 3) reveal();
+      else withFrames.requestVideoFrameCallback!(onFrame);
+    };
+    withFrames.requestVideoFrameCallback(onFrame);
+  };
   const updateStreamDimensions = (video: HTMLVideoElement) => {
     const { videoWidth: width, videoHeight: height } = video;
     if (!width || !height) return;
@@ -1034,7 +1066,9 @@ export default function Portfolio({ initialContent, initialIsMobile }: { initial
                   <div className="viewer-peek-frame" style={{ left: `${frame.left}%`, top: `${frame.top}%`, width: `${frame.width}%`, height: `${frame.height}%` }}>
                     {posterFor(neighbour) && <img src={posterFor(neighbour)} alt="" />}
                   </div>
-                  <span style={{ top: `calc(${frame.top + frame.height}% + 14px)` }}>{neighbour.title}</span>
+                  {creditLine(neighbour) && (
+                    <span className="viewer-media-credit" style={{ top: `calc(${frame.top + frame.height}% + 46px)` }}>{creditLine(neighbour)}</span>
+                  )}
                 </div>
               );
             })}
@@ -1066,6 +1100,7 @@ export default function Portfolio({ initialContent, initialIsMobile }: { initial
                   onResize={(event) => updateStreamDimensions(event.currentTarget)}
                   onTimeUpdate={(event) => setViewerProgress({ seconds: event.currentTarget.currentTime, duration: event.currentTarget.duration || 0 })}
                   onPlay={() => setViewerPlaying(true)}
+                  onPlaying={(event) => revealAfterFirstFrames(event.currentTarget)}
                   onPause={() => setViewerPlaying(false)}
                   onError={() => setStreamFailedFor(current.id)}
                 />
@@ -1079,6 +1114,9 @@ export default function Portfolio({ initialContent, initialIsMobile }: { initial
                   allowFullScreen
                   onLoad={requestViewerDimensions}
                 />
+              )}
+              {currentStreamId && !viewerFirstFrame && posterFor(current) && (
+                <img className="viewer-cover" src={posterFor(current)} alt="" aria-hidden="true" />
               )}
               {videoRect && (
                 <>
@@ -1107,6 +1145,11 @@ export default function Portfolio({ initialContent, initialIsMobile }: { initial
                 </>
               )}
             </div>
+            {/* Phones: the credit moves with the swipe as part of the
+                project, instead of staying put and changing on landing. */}
+            {creditLine(current) && (
+              <span className="viewer-media-credit" style={{ top: `calc(${(videoRect?.top ?? 0) + (videoRect?.height ?? 100)}% + 46px)` }}>{creditLine(current)}</span>
+            )}
           </div>
           <div className="viewer-top"><span>{current.title}</span><button className="viewer-mobile-close" onClick={(event) => { event.stopPropagation(); close(); }} aria-label="Close video">CLOSE ×</button></div>
           <button
@@ -1124,7 +1167,7 @@ export default function Portfolio({ initialContent, initialIsMobile }: { initial
             aria-label="Next project"
           >→</button>
           {current.credits?.length ? (
-            <div className={`viewer-credit ${viewerAtEdge ? "" : "faded"}`}>{current.credits.map((credit) => `${credit.label} by ${credit.value}`).join(" · ")}</div>
+            <div className={`viewer-credit ${viewerAtEdge ? "" : "faded"}`}>{creditLine(current)}</div>
           ) : null}
           <div className={`viewer-count ${viewerAtEdge ? "" : "faded"}`}>{String(viewerIndex! + 1).padStart(2, "0")} / {String(visible.length).padStart(2, "0")}</div>
           <div className="viewer-mobile-bar" onClick={(event) => event.stopPropagation()}>

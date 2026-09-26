@@ -129,7 +129,9 @@ nav button:hover::after { right: 0; }
    bottom bar, progress/fullscreen in their own row under the video, credit
    below that, prev/count/next in the thumb zone, swipe between projects.
    Landscape phones and desktop keep the layout above. */
-.viewer-mobile-bar, .viewer-peek, .viewer-poster { display: none; }
+.viewer-mobile-bar, .viewer-peek, .viewer-poster, .viewer-media-credit { display: none; }
+/* Poster held on top of a native video until it has drawn real frames. */
+.viewer-cover { position: absolute; inset: 0; z-index: 1; width: 100%; height: 100%; object-fit: contain; pointer-events: none; }
 @keyframes viewer-slide-next { from { transform: translateX(100%); } }
 @keyframes viewer-slide-prev { from { transform: translateX(-100%); } }
 @media (pointer: coarse) and (orientation: portrait) {
@@ -150,7 +152,11 @@ nav button:hover::after { right: 0; }
   .viewer-peek.prev { right: calc(100% + 16px); }
   .viewer-peek-frame { position: absolute; overflow: hidden; background: #111; }
   .viewer-peek-frame img { width: 100%; height: 100%; object-fit: cover; display: block; }
-  .viewer-peek span { position: absolute; left: 0; right: 0; padding: 0 16px; font-size: 11px; letter-spacing: .12em; }
+  /* The credit belongs to each project's page (current and swipe previews)
+     so it swipes with it; the fixed one is hidden on phones in portrait. */
+  .viewer-media-credit { display: block; position: absolute; left: 16px; right: 16px; text-align: center; font-size: 10px; letter-spacing: .08em; text-transform: uppercase; opacity: .75; pointer-events: none; }
+  .viewer[data-orientation] .viewer-credit { display: none; }
+  .viewer:fullscreen .viewer-media-credit { display: none; }
   /* Vimeo's own poster frame holds the spot until its player is ready, so
      there's no black gap after swiping to a project. */
   .viewer-poster { display: block; position: absolute; inset: 0; width: 100%; height: 100%; object-fit: contain; pointer-events: none; }
