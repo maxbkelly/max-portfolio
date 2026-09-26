@@ -41,6 +41,11 @@ nav button:hover::after { right: 0; }
 .project-tile:hover .tile-thumbnail { transform: scale(1.07); }
 .tile-preview { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: cover; pointer-events: none; opacity: 0; transition: opacity .3s; }
 .tile-preview.visible { opacity: 1; }
+/* Touch screens: no sticky hover zoom; touching a tile plays its clip once. */
+@media (hover: none) {
+  .project-tile:hover .tile-thumbnail { transform: none; }
+  .project-tile:hover iframe { transform: translate(-50%, -50%) scale(1.02); }
+}
 .tile-shade { position: absolute; inset: 0; background: linear-gradient(0deg, rgba(0,0,0,.4), transparent 50%); }
 .tile-cursor { position: fixed; z-index: 30; top: 0; left: 0; margin-left: 27px; color: #fff; font-size: 10px; font-weight: 400; letter-spacing: .16em; line-height: 1; opacity: 0; pointer-events: none; text-shadow: 0 1px 4px rgba(0,0,0,.8); transition: opacity .12s; white-space: nowrap; }
 .tile-cursor.visible { opacity: 1; }
@@ -73,6 +78,8 @@ nav button:hover::after { right: 0; }
 .viewer-fullscreen { position: absolute; right: 16px; bottom: 10px; z-index: 3; width: 22px; height: 22px; display: flex; align-items: center; justify-content: center; color: #fff; opacity: .85; filter: drop-shadow(0 1px 3px rgba(0,0,0,.7)); }
 .viewer-fullscreen:hover { opacity: 1; }
 .viewer-fullscreen svg { width: 100%; height: 100%; }
+/* 20% larger on phones (also scales the swipe preview's copy, so they match). */
+@media (pointer: coarse) { .viewer-fullscreen { transform: scale(1.2); } }
 .viewer-top { position: absolute; z-index: 2; top: 0; left: 0; right: 0; padding: 24px 3vw; display: flex; justify-content: space-between; font-size: 20px; font-stretch: condensed; font-weight: 800; letter-spacing: .04em; pointer-events: none; }
 .viewer-top > span { display: inline-block; width: fit-content; padding: 5px 9px 4px; border-radius: 2px; background: rgba(5,5,5,.82); line-height: 1; }
 .viewer-mobile-close { display: none; pointer-events: auto; }

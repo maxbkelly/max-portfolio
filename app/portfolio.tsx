@@ -166,14 +166,28 @@ function VideoTile({ project, onOpen }: { project: Project; onOpen: () => void }
     <article
       className="project-tile"
       style={{ "--accent": project.accent } as React.CSSProperties}
+      // Desktop: the clip loops while hovered. Touch screens get their own
+      // behavior below (taps also fire emulated mouse events, so skip those).
       onMouseEnter={() => {
+        if (!window.matchMedia("(hover: hover)").matches) return;
         setActive(true);
         preview.current?.play().catch(() => {});
       }}
       onMouseLeave={() => {
+        if (!window.matchMedia("(hover: hover)").matches) return;
         setActive(false);
         const el = preview.current;
         if (el) { el.pause(); el.currentTime = 0; }
+      }}
+      // Phones: touching a tile (e.g. to scroll) plays its clip through once,
+      // then fades back to the thumbnail.
+      onTouchStart={() => {
+        const el = preview.current;
+        if (!el || !el.paused) return;
+        el.loop = false;
+        el.currentTime = 0;
+        setActive(true);
+        el.play().catch(() => setActive(false));
       }}
       onMouseMove={trackCursor}
     >
@@ -211,6 +225,7 @@ function VideoTile({ project, onOpen }: { project: Project; onOpen: () => void }
             loop
             playsInline
             preload="none"
+            onEnded={() => setActive(false)}
           />
         )}
         <span className="tile-shade" />
