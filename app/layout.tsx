@@ -2,7 +2,7 @@ import type { Metadata } from "next";
 import "./globals.css";
 
 export const metadata: Metadata = {
-  title: "Max — Director & Editor",
+  title: "Maximilian Kelly",
   description: "Director, editor and image maker. Selected films and visual work.",
 };
 
