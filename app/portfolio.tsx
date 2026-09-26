@@ -14,6 +14,15 @@ function fitRect(videoAspect: number, boxAspect: number) {
   return { left: (100 - width) / 2, top: 0, width, height: 100 };
 }
 
+// A project's phone poster frame: its Stream video at the chosen second (or
+// Stream's default frame). Undefined for a project without a Stream video.
+function streamPosterUrl(project: Project) {
+  return project.streamVideoId ? streamThumbnailUrl(project.streamVideoId, project.streamThumbnailTime) : undefined;
+}
+function posterKey(project: Project) {
+  return streamPosterUrl(project) ?? `vimeo:${project.vimeoId}`;
+}
+
 let measureProbe: HTMLSpanElement | null = null;
 // Canvas measureText ignores letter-spacing (and can resolve condensed font
 // stacks differently than the DOM), so measure with a real hidden element
@@ -227,8 +236,8 @@ export default function Portfolio({ initialContent, initialIsMobile }: { initial
   const [viewerSlide, setViewerSlide] = useState<"next" | "prev" | null>(null);
   const [viewerFrameReady, setViewerFrameReady] = useState(false);
   const [peekBoxAspect, setPeekBoxAspect] = useState(375 / 598);
-  const [vimeoThumbs, setVimeoThumbs] = useState<Record<string, { url: string; aspect: number }>>({});
-  const thumbRequests = useRef(new Set<string>());
+  const [posters, setPosters] = useState<Record<string, { url: string; aspect: number }>>({});
+  const posterRequests = useRef(new Set<string>());
   const [mobileVideoBottom, setMobileVideoBottom] = useState<number | null>(null);
   const [heroMuted, setHeroMuted] = useState(true);
   const [heroReady, setHeroReady] = useState(false);
@@ -405,25 +414,36 @@ export default function Portfolio({ initialContent, initialIsMobile }: { initial
     };
   }, [viewerIndex, requestViewerDimensions]);
 
-  // Phones: fetch Vimeo's own poster frame (and the video's shape) for the
-  // open project and its neighbours, so the swipe preview and the moment
-  // before the player loads show the real frame, not the square grid
-  // thumbnail. Vimeo's public oEmbed lookup covers unlisted videos too.
+  // Phones: load the poster frame (and the video's shape) for the open
+  // project and its neighbours, so the swipe preview and the layout before
+  // playback are right. Projects on Stream use Stream's own frame — the
+  // loaded image's size gives the video's shape — so phones make no Vimeo
+  // requests. Only a project without a Stream video falls back to Vimeo's
+  // public oEmbed lookup.
   useEffect(() => {
     if (viewerIndex === null || !isMobileHero || !visible.length) return;
     for (const offset of [0, 1, -1]) {
       const project = visible[(viewerIndex + offset + visible.length) % visible.length];
-      if (thumbRequests.current.has(project.vimeoId)) continue;
-      thumbRequests.current.add(project.vimeoId);
+      const key = posterKey(project);
+      if (posterRequests.current.has(key)) continue;
+      posterRequests.current.add(key);
+      const streamUrl = streamPosterUrl(project);
+      if (streamUrl) {
+        const image = new Image();
+        image.onload = () => setPosters((posters) => ({ ...posters, [key]: { url: streamUrl, aspect: image.naturalWidth / image.naturalHeight } }));
+        image.onerror = () => posterRequests.current.delete(key);
+        image.src = streamUrl;
+        continue;
+      }
       const vimeoUrl = `https://vimeo.com/${project.vimeoId}${project.vimeoHash ? `/${project.vimeoHash}` : ""}`;
       fetch(`https://vimeo.com/api/oembed.json?url=${encodeURIComponent(vimeoUrl)}&width=1280`)
         .then((response) => response.ok ? response.json() : Promise.reject(new Error(String(response.status))))
         .then((data: { thumbnail_url?: string; width?: number; height?: number }) => {
           if (!data.thumbnail_url || !data.width || !data.height) return;
           new Image().src = data.thumbnail_url;
-          setVimeoThumbs((thumbs) => ({ ...thumbs, [project.vimeoId]: { url: data.thumbnail_url!, aspect: data.width! / data.height! } }));
+          setPosters((posters) => ({ ...posters, [key]: { url: data.thumbnail_url!, aspect: data.width! / data.height! } }));
         })
-        .catch(() => thumbRequests.current.delete(project.vimeoId));
+        .catch(() => posterRequests.current.delete(key));
     }
   }, [viewerIndex, isMobileHero, visible]);
 
@@ -670,30 +690,27 @@ export default function Portfolio({ initialContent, initialIsMobile }: { initial
   // Phones play a project's Stream video when it has one (falling back to
   // Vimeo if it fails); desktop always uses Vimeo.
   const currentStreamId = current && isMobileHero && current.streamVideoId && streamFailedFor !== current.id ? current.streamVideoId : undefined;
-  // The frame shown before a project plays and in the swipe preview: the
-  // chosen Stream moment if set, otherwise Vimeo's own poster.
+  // The frame shown before a project plays and in the swipe preview, and the
+  // video shape it implies (known once the poster image has loaded).
+  const posterFor = (project: Project) => streamPosterUrl(project) ?? posters[posterKey(project)]?.url;
+  const aspectFor = (project: Project) => posters[posterKey(project)]?.aspect;
   // iPhones don't load a native video until it's played, and for HLS often
   // report 0×0 at first, so the layout (progress row, credit position)
-  // would never be computed. Use the shape from Vimeo's oEmbed until the
-  // video reports its own, and only update when the shape actually changes
+  // would never be computed. Use the poster frame's shape until the video
+  // reports its own, and only update when the shape actually changes
   // (adaptive quality steps keep the same aspect ratio).
+  const currentPosterAspect = current ? aspectFor(current) : undefined;
   useEffect(() => {
-    if (!currentStreamId || !current || dimensionsKnown) return;
-    const thumb = vimeoThumbs[current.vimeoId];
-    if (!thumb) return;
-    setViewerDimensions({ width: thumb.aspect * 1000, height: 1000 });
+    if (!currentStreamId || !currentPosterAspect || dimensionsKnown) return;
+    setViewerDimensions({ width: currentPosterAspect * 1000, height: 1000 });
     setDimensionsKnown(true);
-  }, [currentStreamId, current, vimeoThumbs, dimensionsKnown]);
+  }, [currentStreamId, currentPosterAspect, dimensionsKnown]);
   const updateStreamDimensions = (video: HTMLVideoElement) => {
     const { videoWidth: width, videoHeight: height } = video;
     if (!width || !height) return;
     setViewerDimensions((dimensions) => Math.abs(dimensions.width / dimensions.height - width / height) < 0.01 ? dimensions : { width, height });
     setDimensionsKnown(true);
   };
-  const posterFor = (project: Project) =>
-    project.streamVideoId && typeof project.streamThumbnailTime === "number"
-      ? streamThumbnailUrl(project.streamVideoId, project.streamThumbnailTime)
-      : vimeoThumbs[project.vimeoId]?.url;
 
   // The server guesses phone vs. desktop from the user agent so the right
   // hero is already in the HTML; this corrects the rare wrong guess (e.g.
@@ -1010,9 +1027,8 @@ export default function Portfolio({ initialContent, initialIsMobile }: { initial
           >
             {dragX !== null && ([["prev", -1], ["next", 1]] as const).map(([side, offset]) => {
               const neighbour = visible[(viewerIndex! + offset + visible.length) % visible.length];
-              const thumb = vimeoThumbs[neighbour.vimeoId];
               // Placed exactly where that video will sit once it loads.
-              const frame = fitRect(thumb?.aspect ?? 16 / 9, peekBoxAspect);
+              const frame = fitRect(aspectFor(neighbour) ?? 16 / 9, peekBoxAspect);
               return (
                 <div className={`viewer-peek ${side}`} key={side} aria-hidden="true">
                   <div className="viewer-peek-frame" style={{ left: `${frame.left}%`, top: `${frame.top}%`, width: `${frame.width}%`, height: `${frame.height}%` }}>
@@ -1026,7 +1042,11 @@ export default function Portfolio({ initialContent, initialIsMobile }: { initial
               className="viewer-video-rect"
               style={videoRect ? { left: `${videoRect.left}%`, top: `${videoRect.top}%`, width: `${videoRect.width}%`, height: `${videoRect.height}%` } : undefined}
             >
-              {isMobileHero && posterFor(current) && (
+              {/* Covers the Vimeo iframe while it loads. Not used under a
+                  native Stream video, which shows its own poster sized
+                  exactly to itself — an image behind it peeked out as a
+                  thin line and around iOS's first decoded frame. */}
+              {isMobileHero && !currentStreamId && posterFor(current) && (
                 <img className="viewer-poster" src={posterFor(current)} alt="" aria-hidden="true" />
               )}
               {currentStreamId ? (
