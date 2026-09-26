@@ -26,6 +26,22 @@ function posterKey(project: Project) {
   return streamPosterUrl(project) ?? `vimeo:${project.vimeoId}`;
 }
 
+const FULLSCREEN_ICON = (
+  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.2" strokeLinecap="round" aria-hidden="true">
+    <path d="M3 7V3h4" /><path d="M21 7V3h-4" /><path d="M3 17v4h4" /><path d="M21 17v4h-4" />
+    <path d="M15 9l2.3-2.3" /><path d="M17.3 8v-1.3h-1.3" />
+    <path d="M9 15l-2.3 2.3" /><path d="M6.7 16v1.3h1.3" />
+  </svg>
+);
+
+// The phone viewer's media area (see the portrait .viewer-media inset in
+// globals.css: 64px above, 150px below), so a project can be laid out
+// before the viewer has even rendered.
+function estimateMediaBoxAspect() {
+  const portrait = window.matchMedia("(orientation: portrait)").matches;
+  return window.innerWidth / Math.max(1, window.innerHeight - (portrait ? 214 : 0));
+}
+
 let measureProbe: HTMLSpanElement | null = null;
 // Canvas measureText ignores letter-spacing (and can resolve condensed font
 // stacks differently than the DOM), so measure with a real hidden element
@@ -239,7 +255,7 @@ export default function Portfolio({ initialContent, initialIsMobile }: { initial
   const [viewerSlide, setViewerSlide] = useState<"next" | "prev" | null>(null);
   const [viewerFrameReady, setViewerFrameReady] = useState(false);
   const [viewerFirstFrame, setViewerFirstFrame] = useState(false);
-  const [peekBoxAspect, setPeekBoxAspect] = useState(375 / 598);
+  const [mediaBoxAspect, setMediaBoxAspect] = useState(375 / 598);
   const [posters, setPosters] = useState<Record<string, { url: string; aspect: number }>>({});
   const posterRequests = useRef(new Set<string>());
   const [mobileVideoBottom, setMobileVideoBottom] = useState<number | null>(null);
@@ -315,6 +331,9 @@ export default function Portfolio({ initialContent, initialIsMobile }: { initial
   const close = useCallback(() => {
     setViewerIndex(null);
     setViewerPlaying(false);
+    // So the next project opened isn't laid out with this one's shape.
+    setDimensionsKnown(false);
+    setVideoRect(null);
   }, []);
   const move = useCallback((direction: number) => {
     setViewerPlaying(false);
@@ -418,6 +437,20 @@ export default function Portfolio({ initialContent, initialIsMobile }: { initial
       window.removeEventListener("message", receive);
     };
   }, [viewerIndex, requestViewerDimensions]);
+
+  // Keep the media area's shape current while a project is open (rotation,
+  // Safari's toolbar collapsing), since the phone layout is computed from it.
+  const viewerIsOpen = viewerIndex !== null;
+  useEffect(() => {
+    if (!viewerIsOpen || !isMobileHero) return;
+    const measure = () => {
+      const media = viewerMedia.current;
+      setMediaBoxAspect(media?.offsetHeight ? media.offsetWidth / media.offsetHeight : estimateMediaBoxAspect());
+    };
+    measure();
+    window.addEventListener("resize", measure);
+    return () => window.removeEventListener("resize", measure);
+  }, [viewerIsOpen, isMobileHero]);
 
   // Phones: load the poster frame (and the video's shape) for the open
   // project and its neighbours, so the swipe preview and the layout before
@@ -549,7 +582,7 @@ export default function Portfolio({ initialContent, initialIsMobile }: { initial
     const touch = event.touches[0];
     swipeStart.current = { x: touch.clientX, y: touch.clientY, t: performance.now(), horizontal: false };
     const media = viewerMedia.current;
-    if (media) setPeekBoxAspect(media.offsetWidth / media.offsetHeight);
+    if (media) setMediaBoxAspect(media.offsetWidth / media.offsetHeight);
   };
 
   const onViewerTouchMove = (event: React.TouchEvent<HTMLDivElement>) => {
@@ -705,6 +738,13 @@ export default function Portfolio({ initialContent, initialIsMobile }: { initial
   // reports its own, and only update when the shape actually changes
   // (adaptive quality steps keep the same aspect ratio).
   const currentPosterAspect = current ? aspectFor(current) : undefined;
+  // Phones with a Stream video: the video's box is computed during render
+  // from its shape (the poster frame's until the video reports its own) and
+  // the media area, so after a swipe the new project is laid out — progress
+  // bar, fullscreen button and credit included — on its very first frame,
+  // instead of a frame or two later once the effects catch up.
+  const displayAspect = dimensionsKnown ? viewerDimensions.width / viewerDimensions.height : currentPosterAspect;
+  const shownRect = isMobileHero && currentStreamId && displayAspect ? fitRect(displayAspect, mediaBoxAspect) : videoRect;
   useEffect(() => {
     if (!currentStreamId || !currentPosterAspect || dimensionsKnown) return;
     setViewerDimensions({ width: currentPosterAspect * 1000, height: 1000 });
@@ -732,7 +772,9 @@ export default function Portfolio({ initialContent, initialIsMobile }: { initial
     let frames = 0;
     const onFrame = () => {
       frames += 1;
-      if (frames >= 3) reveal();
+      // The first drawn frame is iOS's half-size one; lift on the second so
+      // the picture lands as close to the sound as possible.
+      if (frames >= 2) reveal();
       else withFrames.requestVideoFrameCallback!(onFrame);
     };
     withFrames.requestVideoFrameCallback(onFrame);
@@ -1011,7 +1053,10 @@ export default function Portfolio({ initialContent, initialIsMobile }: { initial
 
       <section id="work" className={`work ${showWork ? "revealed" : ""}`}>
         <div className="grid">
-          {visible.map((project, index) => <VideoTile key={project.id} project={project} onOpen={() => setViewerIndex(index)} />)}
+          {visible.map((project, index) => <VideoTile key={project.id} project={project} onOpen={() => {
+            if (isMobileHero) setMediaBoxAspect(estimateMediaBoxAspect());
+            setViewerIndex(index);
+          }} />)}
         </div>
       </section>
 
@@ -1060,11 +1105,16 @@ export default function Portfolio({ initialContent, initialIsMobile }: { initial
             {dragX !== null && ([["prev", -1], ["next", 1]] as const).map(([side, offset]) => {
               const neighbour = visible[(viewerIndex! + offset + visible.length) % visible.length];
               // Placed exactly where that video will sit once it loads.
-              const frame = fitRect(aspectFor(neighbour) ?? 16 / 9, peekBoxAspect);
+              const frame = fitRect(aspectFor(neighbour) ?? 16 / 9, mediaBoxAspect);
               return (
                 <div className={`viewer-peek ${side}`} key={side} aria-hidden="true">
                   <div className="viewer-peek-frame" style={{ left: `${frame.left}%`, top: `${frame.top}%`, width: `${frame.width}%`, height: `${frame.height}%` }}>
                     {posterFor(neighbour) && <img src={posterFor(neighbour)} alt="" />}
+                  </div>
+                  {/* The incoming page's controls, so it slides in complete. */}
+                  <div className="viewer-peek-rect" style={{ left: `${frame.left}%`, top: `${frame.top}%`, width: `${frame.width}%`, height: `${frame.height}%` }}>
+                    <div className="viewer-progress"><div className="viewer-progress-track" /></div>
+                    <span className="viewer-fullscreen">{FULLSCREEN_ICON}</span>
                   </div>
                   {creditLine(neighbour) && (
                     <span className="viewer-media-credit" style={{ top: `calc(${frame.top + frame.height}% + 46px)` }}>{creditLine(neighbour)}</span>
@@ -1074,7 +1124,7 @@ export default function Portfolio({ initialContent, initialIsMobile }: { initial
             })}
             <div
               className="viewer-video-rect"
-              style={videoRect ? { left: `${videoRect.left}%`, top: `${videoRect.top}%`, width: `${videoRect.width}%`, height: `${videoRect.height}%` } : undefined}
+              style={shownRect ? { left: `${shownRect.left}%`, top: `${shownRect.top}%`, width: `${shownRect.width}%`, height: `${shownRect.height}%` } : undefined}
             >
               {/* Covers the Vimeo iframe while it loads. Not used under a
                   native Stream video, which shows its own poster sized
@@ -1118,7 +1168,7 @@ export default function Portfolio({ initialContent, initialIsMobile }: { initial
               {currentStreamId && !viewerFirstFrame && posterFor(current) && (
                 <img className="viewer-cover" src={posterFor(current)} alt="" aria-hidden="true" />
               )}
-              {videoRect && (
+              {shownRect && (
                 <>
                   <div className="viewer-progress" onClick={(event) => event.stopPropagation()} onPointerDown={startSeek}>
                     <div className="viewer-progress-track">
@@ -1136,11 +1186,7 @@ export default function Portfolio({ initialContent, initialIsMobile }: { initial
                     onMouseLeave={() => setCursorSuppressed(false)}
                     aria-label={viewerFullscreen ? "Exit fullscreen" : "Enter fullscreen"}
                   >
-                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.2" strokeLinecap="round" aria-hidden="true">
-                      <path d="M3 7V3h4" /><path d="M21 7V3h-4" /><path d="M3 17v4h4" /><path d="M21 17v4h-4" />
-                      <path d="M15 9l2.3-2.3" /><path d="M17.3 8v-1.3h-1.3" />
-                      <path d="M9 15l-2.3 2.3" /><path d="M6.7 16v1.3h1.3" />
-                    </svg>
+                    {FULLSCREEN_ICON}
                   </button>
                 </>
               )}
@@ -1148,7 +1194,7 @@ export default function Portfolio({ initialContent, initialIsMobile }: { initial
             {/* Phones: the credit moves with the swipe as part of the
                 project, instead of staying put and changing on landing. */}
             {creditLine(current) && (
-              <span className="viewer-media-credit" style={{ top: `calc(${(videoRect?.top ?? 0) + (videoRect?.height ?? 100)}% + 46px)` }}>{creditLine(current)}</span>
+              <span className="viewer-media-credit" style={{ top: `calc(${(shownRect?.top ?? 0) + (shownRect?.height ?? 100)}% + 46px)` }}>{creditLine(current)}</span>
             )}
           </div>
           <div className="viewer-top"><span>{current.title}</span><button className="viewer-mobile-close" onClick={(event) => { event.stopPropagation(); close(); }} aria-label="Close video">CLOSE ×</button></div>
