@@ -752,30 +752,38 @@ export default function Portfolio({ initialContent, initialIsMobile }: { initial
   }, [currentStreamId, currentPosterAspect, dimensionsKnown]);
   // After play, iOS hides the poster and shows black while it buffers, then
   // draws one frame at about half size before snapping to full size. Keep
-  // the poster on top of the video until a few real frames have been drawn,
-  // so that all happens out of sight.
+  // the poster on top of the video until that's over, then lift it at once.
+  //
+  // The main signal is the video's own clock, checked every screen refresh:
+  // media time only starts moving once frames are showing, so a little past
+  // zero is just after iOS's one bad frame — and ahead of the sound (in a
+  // recording without the cover, the picture led the sound by ~90ms).
+  // A "frame drawn" callback alone reached iPhones late, leaving the sound
+  // running ~0.4s under the poster; it's kept as a second signal, with a
+  // timeout as the last resort.
   const revealAfterFirstFrames = (video: HTMLVideoElement) => {
     if (viewerFirstFrame) return;
-    // Ignore if the viewer has moved on to another project meanwhile.
-    const reveal = () => { if (viewerVideo.current === video) setViewerFirstFrame(true); };
+    let done = false;
+    const reveal = () => {
+      if (done) return;
+      done = true;
+      // Ignore if the viewer has moved on to another project meanwhile.
+      if (viewerVideo.current === video) setViewerFirstFrame(true);
+    };
     window.setTimeout(reveal, 1500);
+    const watchClock = () => {
+      if (done) return;
+      if (video.currentTime >= 0.06) reveal();
+      else requestAnimationFrame(watchClock);
+    };
+    requestAnimationFrame(watchClock);
     const withFrames = video as HTMLVideoElement & { requestVideoFrameCallback?: (callback: () => void) => number };
-    if (!withFrames.requestVideoFrameCallback) {
-      const check = () => {
-        if (video.currentTime < 0.2) return;
-        video.removeEventListener("timeupdate", check);
-        reveal();
-      };
-      video.addEventListener("timeupdate", check);
-      return;
-    }
+    if (!withFrames.requestVideoFrameCallback) return;
     let frames = 0;
     const onFrame = () => {
       frames += 1;
-      // The first drawn frame is iOS's half-size one; lift on the second so
-      // the picture lands as close to the sound as possible.
       if (frames >= 2) reveal();
-      else withFrames.requestVideoFrameCallback!(onFrame);
+      else if (!done) withFrames.requestVideoFrameCallback!(onFrame);
     };
     withFrames.requestVideoFrameCallback(onFrame);
   };
@@ -1114,7 +1122,9 @@ export default function Portfolio({ initialContent, initialIsMobile }: { initial
                   {/* The incoming page's controls, so it slides in complete. */}
                   <div className="viewer-peek-rect" style={{ left: `${frame.left}%`, top: `${frame.top}%`, width: `${frame.width}%`, height: `${frame.height}%` }}>
                     <div className="viewer-progress"><div className="viewer-progress-track" /></div>
-                    <span className="viewer-fullscreen">{FULLSCREEN_ICON}</span>
+                    {/* A real (inert) button, so browser button styling makes it
+                        exactly the size of the real one it hands over to. */}
+                    <button type="button" className="viewer-fullscreen" tabIndex={-1} aria-hidden="true">{FULLSCREEN_ICON}</button>
                   </div>
                   {creditLine(neighbour) && (
                     <span className="viewer-media-credit" style={{ top: `calc(${frame.top + frame.height}% + 46px)` }}>{creditLine(neighbour)}</span>
