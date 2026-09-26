@@ -22,8 +22,10 @@ export type Project = {
 // Cloudflare Stream account subdomain (public — it's in every playback URL).
 const STREAM_HOST = "https://customer-qjq3psc9xlff062z.cloudflarestream.com";
 export const streamHlsUrl = (videoId: string) => `${STREAM_HOST}/${videoId}/manifest/video.m3u8`;
-export const streamThumbnailUrl = (videoId: string, seconds: number) =>
-  `${STREAM_HOST}/${videoId}/thumbnails/thumbnail.jpg?time=${seconds}s&height=1080`;
+// Without a time, Stream returns the video's default poster frame (set per
+// video in Stream, currently 20% of the way in).
+export const streamThumbnailUrl = (videoId: string, seconds?: number) =>
+  `${STREAM_HOST}/${videoId}/thumbnails/thumbnail.jpg?${typeof seconds === "number" ? `time=${seconds}s&` : ""}height=1080`;
 
 export type PortfolioSection = {
   id: string;

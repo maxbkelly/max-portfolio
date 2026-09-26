@@ -41,7 +41,7 @@ export const projectType = defineType({
     defineField({
       name: "streamThumbnailTime",
       title: "Phone poster frame (seconds)",
-      description: "Optional. Which moment of the Stream video to show before it plays — e.g. 12 for 12 seconds in. Leave blank to use the Vimeo thumbnail.",
+      description: "Optional. Which moment of the Stream video phones show before it plays (and in the swipe preview) — e.g. 12 for 12 seconds in. Leave blank to use the video's default frame in Stream (20% of the way through).",
       type: "number",
       validation: (Rule) => Rule.min(0),
     }),
