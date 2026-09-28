@@ -29,6 +29,13 @@ const worker = {
   async fetch(request: Request, env: Env, ctx: ExecutionContext): Promise<Response> {
     const url = new URL(request.url);
 
+    // One address for search engines: the bare domain forwards to www,
+    // as the old Squarespace site did, keeping the path and query.
+    if (url.hostname === "maxbkelly.com") {
+      url.hostname = "www.maxbkelly.com";
+      return Response.redirect(url.toString(), 301);
+    }
+
     if (url.pathname === "/_vinext/image") {
       const allowedWidths = [...DEFAULT_DEVICE_SIZES, ...DEFAULT_IMAGE_SIZES];
       return handleImageOptimization(request, {
