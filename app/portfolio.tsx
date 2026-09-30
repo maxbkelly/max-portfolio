@@ -280,6 +280,7 @@ export default function Portfolio({ initialContent, initialIsMobile }: { initial
   const [animationMinDone, setAnimationMinDone] = useState(false);
   const [isMobileHero, setIsMobileHero] = useState(initialIsMobile);
   const [heroFileFailed, setHeroFileFailed] = useState(false);
+  const [heroAutoplayBlocked, setHeroAutoplayBlocked] = useState(false);
   const [streamFailedFor, setStreamFailedFor] = useState<string | null>(null);
   const [heroCursor, setHeroCursor] = useState({ x: 0, y: 0 });
   const [cursor, setCursor] = useState({ x: 0, y: 0, visible: false });
@@ -926,7 +927,12 @@ export default function Portfolio({ initialContent, initialIsMobile }: { initial
     }
     el.muted = true;
     el.setAttribute("muted", "");
-    el.play().catch(() => setHeroReady(true));
+    el.play().catch((error: unknown) => {
+      // NotAllowedError is the browser refusing autoplay outright (e.g.
+      // Low Power Mode), which also means it never loaded a first frame.
+      if (error instanceof DOMException && error.name === "NotAllowedError") setHeroAutoplayBlocked(true);
+      setHeroReady(true);
+    });
     const safetyNet = window.setTimeout(() => setHeroReady(true), 10000);
     return () => window.clearTimeout(safetyNet);
   }, [heroFileUrl, contentReady]);
@@ -1047,9 +1053,18 @@ export default function Portfolio({ initialContent, initialIsMobile }: { initial
             playsInline
             preload="auto"
             aria-label="Maximilian Kelly editors reel"
-            onPlaying={() => setHeroReady(true)}
+            onPlaying={() => {
+              setHeroReady(true);
+              setHeroAutoplayBlocked(false);
+            }}
             onError={() => setHeroFileFailed(true)}
           />
+        )}
+        {/* Phones only, and only once autoplay has actually been refused —
+            otherwise the blocked reel is just grey. Tapping the hero plays
+            the reel (with sound), which removes the still. */}
+        {isMobileHero && heroAutoplayBlocked && heroFileUrl && content.homepageReelMobileStillUrl && (
+          <img className="hero-video hero-video-file" src={content.homepageReelMobileStillUrl} alt="" aria-hidden="true" />
         )}
         {contentReady && !heroFileUrl && (
           <iframe
