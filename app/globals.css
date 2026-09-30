@@ -31,6 +31,7 @@ nav button:hover::after { right: 0; }
 .hero-sound-desktop { position: fixed; top: 0; left: 0; transform: translate3d(var(--hero-cursor-x, 0px), var(--hero-cursor-y, 0px), 0) translate(24px, -50%); opacity: 0; transition: opacity .15s; pointer-events: none; }
 .hero:hover .hero-sound-desktop { opacity: 1; }
 .hero-sound-mobile { display: none; }
+.hero-play-reel { position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%); white-space: nowrap; pointer-events: none; }
 .eyebrow { font-size: 10px; letter-spacing: .22em; margin: 0 0 20px; }
 .work { min-height: 100vh; padding: 120px 3vw 170px; }
 .grid { display: grid; grid-template-columns: repeat(4, 22%); justify-content: space-between; column-gap: 0; row-gap: 7.2vw; }

@@ -970,6 +970,8 @@ export default function Portfolio({ initialContent, initialIsMobile }: { initial
     }
   }, [heroReady, hideAnimation, loadingAnimationUrl]);
 
+  const showHeroStill = Boolean(isMobileHero && heroAutoplayBlocked && heroFileUrl && content.homepageReelMobileStillUrl);
+
   const toggleHeroSound = () => {
     const nextMuted = !heroMuted;
     if (heroFile.current) {
@@ -1062,9 +1064,12 @@ export default function Portfolio({ initialContent, initialIsMobile }: { initial
         )}
         {/* Phones only, and only once autoplay has actually been refused —
             otherwise the blocked reel is just grey. Tapping the hero plays
-            the reel (with sound), which removes the still. */}
-        {isMobileHero && heroAutoplayBlocked && heroFileUrl && content.homepageReelMobileStillUrl && (
-          <img className="hero-video hero-video-file" src={content.homepageReelMobileStillUrl} alt="" aria-hidden="true" />
+            the reel (with sound), which removes the still and its label. */}
+        {showHeroStill && (
+          <>
+            <img className="hero-video hero-video-file" src={content.homepageReelMobileStillUrl} alt="" aria-hidden="true" />
+            <span className="hero-sound hero-play-reel" aria-hidden="true">PLAY REEL</span>
+          </>
         )}
         {contentReady && !heroFileUrl && (
           <iframe
@@ -1084,9 +1089,11 @@ export default function Portfolio({ initialContent, initialIsMobile }: { initial
         >
           {heroMuted ? "SOUND ON" : "SOUND OFF"}
         </button>
-        <button className="hero-sound hero-sound-mobile" type="button" onClick={toggleHeroSound}>
-          {heroMuted ? "SOUND OFF" : "SOUND ON"}
-        </button>
+        {!showHeroStill && (
+          <button className="hero-sound hero-sound-mobile" type="button" onClick={toggleHeroSound}>
+            {heroMuted ? "SOUND OFF" : "SOUND ON"}
+          </button>
+        )}
       </section>
 
       <section id="work" className={`work ${showWork ? "revealed" : ""}`}>
