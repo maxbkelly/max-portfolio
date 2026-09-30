@@ -39,6 +39,12 @@ export const siteSettingsType = defineType({
       options: {accept: "video/mp4"},
     }),
     defineField({
+      name: "homepageReelMobileStill",
+      title: "Mobile homepage reel — still image",
+      description: "Optional. A still of the mobile reel (e.g. its first frame, 9:16). Only shown on phones that block the reel from playing by itself, such as iPhones in Low Power Mode — tapping it plays the reel. Everyone else never sees it.",
+      type: "image",
+    }),
+    defineField({
       name: "loadingAnimationDesktop",
       title: "Loading animation — desktop",
       description: "Optional. A short, small, silent MP4 (a few seconds, well under 1 MB) that loops on desktop while the homepage reel loads. Leave blank to show nothing until the reel starts.",
