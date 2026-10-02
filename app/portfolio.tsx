@@ -25,6 +25,14 @@ function creditLine(project: Project) {
 function posterKey(project: Project) {
   return streamPosterUrl(project) ?? `vimeo:${project.vimeoId}`;
 }
+// Umami analytics (script in the layout). It's missing when blocked by the
+// visitor, and only reports on the live site, so events are best-effort.
+function trackProjectEvent(name: "Thumbnail clicked" | "Video played", project: Project, section = "") {
+  const umami = (window as Window & { umami?: { track: (event: string, data?: Record<string, string>) => void } }).umami;
+  try {
+    umami?.track(name, { project: project.title.trim(), section: section.trim() });
+  } catch { /* Analytics must never break the site. */ }
+}
 
 const FULLSCREEN_ICON = (
   <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.2" strokeLinecap="round" aria-hidden="true">
@@ -741,6 +749,17 @@ export default function Portfolio({ initialContent, initialIsMobile }: { initial
   };
 
   const current = viewerIndex === null ? null : visible[viewerIndex];
+
+  // "Video played" counts once each time a project is shown and its PLAY is
+  // pressed — pausing and resuming doesn't add more, but opening or
+  // swiping to a project again does.
+  const playTrackedFor = useRef<Project | null>(null);
+  useEffect(() => { playTrackedFor.current = null; }, [viewerIndex]);
+  useEffect(() => {
+    if (!viewerPlaying || !current || playTrackedFor.current === current) return;
+    playTrackedFor.current = current;
+    trackProjectEvent("Video played", current, activeSection?.title);
+  }, [viewerPlaying, current, activeSection?.title]);
   // Phones play a project's Stream video when it has one (falling back to
   // Vimeo if it fails); desktop always uses Vimeo.
   const currentStreamId = current && isMobileHero && current.streamVideoId && streamFailedFor !== current.id ? current.streamVideoId : undefined;
@@ -1099,6 +1118,7 @@ export default function Portfolio({ initialContent, initialIsMobile }: { initial
       <section id="work" className={`work ${showWork ? "revealed" : ""}`}>
         <div className="grid">
           {visible.map((project, index) => <VideoTile key={project.id} project={project} onOpen={() => {
+            trackProjectEvent("Thumbnail clicked", project, activeSection?.title);
             if (isMobileHero) setMediaBoxAspect(estimateMediaBoxAspect());
             setViewerIndex(index);
           }} />)}
